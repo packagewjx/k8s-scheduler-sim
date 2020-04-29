@@ -35,7 +35,18 @@
 ## TODO List
 
 - [ ] 数据读取接口的设计
+  - [x] DeploymentController设计。用于在每个时钟周期向集群提交数据
+  - [ ] 使用阿里巴巴2017年数据，实现符合该数据集的DeploymentController
 - [ ] 模拟器设计
   - [ ] Pod模拟器设计
+    - [x] 初步可运行框架设计
+    - [ ] 整合Kubernetes API的Pod
+    - [ ] `client-go` API可访问
   - [ ] Node模拟器设计
+    - [x] 模拟节点运行逻辑设计
+    - [ ] 整合Kubernetes API的Node
+    - [ ] `client-go` API可访问
 - [ ] 监控系统的设计
+  - [ ] 监控数据设计
+  - [x] 节点监控数据采集
+  - [ ] 监控数据统计

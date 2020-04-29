@@ -1,56 +1,32 @@
 package simulate
 
 import (
-	"fmt"
 	"math"
-	"math/rand"
 	"testing"
 )
 
-type mockPod struct {
-	name string
+type mockAlgorithm struct {
 }
 
-func (pod *mockPod) Name() string {
-	if pod.name == "" {
-		pod.name = fmt.Sprintf("Mock-%f", rand.Float64())
-	}
-	return pod.name
+func (_ *mockAlgorithm) Tick(slot []float64, mem int) (Load float64, MemUsage int) {
+	return 1, 100
 }
 
-func (pod *mockPod) Priority() int {
-	return 0
-}
-
-func (pod *mockPod) Type() string {
-	return "Mock"
-}
-
-func (pod *mockPod) ResourceLimit() (cpuLimit int, memLimit float64) {
-	return 1, 1
-}
-
-func (pod *mockPod) ResourceRequest() (cpu int, mem float64) {
-	return 1, 0.01
-}
-
-func (pod *mockPod) Tick(_ []float64, _ float64) (Load, MemUsage float64) {
-	return 1, 0.01
-}
-
-func (pod *mockPod) GetState() PodState {
-	return RunningState
-}
-
-func (pod *mockPod) DeploymentController() DeploymentController {
-	return nil
+func (_ *mockAlgorithm) ResourceRequest() (cpu int, mem int) {
+	return 1, 100
 }
 
 func TestFairScheduler(t *testing.T) {
 	sched := NewFairScheduler()
-	readyPods := make([]Pod, 10)
+	readyPods := make([]*Pod, 10)
+	ma := &mockAlgorithm{}
+	builder := PodBuilder{
+		AlgorithmFactory: func(pod *Pod) PodAlgorithm {
+			return ma
+		},
+	}
 	for i := 0; i < len(readyPods); i++ {
-		readyPods[i] = &mockPod{}
+		readyPods[i] = builder.Build()
 	}
 
 	cases := []struct {

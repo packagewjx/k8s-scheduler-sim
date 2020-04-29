@@ -6,21 +6,26 @@ import (
 )
 
 func TestNodeRun(t *testing.T) {
-	node := NewNode(8, 1, NewFairScheduler())
+	builder := NodeBuilder{
+		Name:        "TestNode",
+		Labels:      nil,
+		Annotations: nil,
+		Taints:      nil,
+		CoreCount:   8,
+		MemorySize:  1000,
+		Scheduler:   NewFairScheduler(),
+	}
+	node := builder.Build()
 	dc := NewMockDeploymentController()
+	podBuilder := &PodBuilder{
+		CpuLimit:         1,
+		MemLimit:         100,
+		Controller:       dc,
+		AlgorithmFactory: FactoryMethod(1, 1000),
+	}
 	for i := 0; i < 10; i++ {
-		node.AddPod(&BatchPod{
-			BasePod: &BasePod{
-				name:                 fmt.Sprintf("Batch-%d", i),
-				podType:              "Batch",
-				priority:             0,
-				deploymentController: dc,
-				cpuLimit:             1,
-				memLimit:             1,
-			},
-			memUsage:  0.05,
-			totalTick: 5000,
-		})
+		podBuilder.Name = fmt.Sprintf("Batch-%d", i)
+		node.AddPod(podBuilder.Build())
 	}
 	for i := 0; i < 10000; i++ {
 		metric := node.Tick()

@@ -18,5 +18,5 @@ func (ctrl *mockDeploymentController) Tick() (addPod []Pod, removePod []Pod) {
 }
 
 func (ctrl *mockDeploymentController) InformPodEvent(event *PodEvent) {
-	fmt.Printf("%s has terminated.\n", event.Who.Name())
+	fmt.Printf("%s has terminated.\n", event.Who.Name)
 }

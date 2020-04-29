@@ -5,7 +5,7 @@ type CoreScheduler interface {
 	// Schedule 将readyPods调度到各个CPU中，并分配相应的时间片执行。
 	// cpuState 长度与节点实际CPU数量相等，是上个周期内节点CPU所运行的所有的Pod的队列。
 	//          初始化时，每个队列为空，但是有CPU核数个队列
-	Schedule(readyPods []Pod, cpuState [][]*RunEntity) [][]*RunEntity
+	Schedule(readyPods []*Pod, cpuState [][]*RunEntity) [][]*RunEntity
 }
 
 func NewFairScheduler() CoreScheduler {
@@ -16,7 +16,7 @@ func NewFairScheduler() CoreScheduler {
 type FairScheduler struct {
 }
 
-func (s *FairScheduler) Schedule(readyPods []Pod, cpuState [][]*RunEntity) [][]*RunEntity {
+func (s *FairScheduler) Schedule(readyPods []*Pod, cpuState [][]*RunEntity) [][]*RunEntity {
 	totalCpu := len(cpuState)
 
 	// 使用RoundRobin策略
@@ -28,8 +28,8 @@ func (s *FairScheduler) Schedule(readyPods []Pod, cpuState [][]*RunEntity) [][]*
 	}
 	cpuIdx := 0
 	for i := 0; i < len(readyPods); i++ {
-		cpu, _ := readyPods[i].ResourceRequest()
-		cpuLimit, _ := readyPods[i].ResourceLimit()
+		cpu, _ := readyPods[i].Algorithm.ResourceRequest()
+		cpuLimit := readyPods[i].CpuLimit
 		// 检查不能超过界限，也不能超过节点的CPU数
 		if cpu > totalCpu {
 			cpu = totalCpu

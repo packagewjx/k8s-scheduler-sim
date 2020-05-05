@@ -21,6 +21,8 @@ type Pod struct {
 	Algorithm PodAlgorithm
 }
 
+// PodAlgorithmFactory 构造Pod核心算法的工厂方法，为了让算法能够访问Pod，工厂方法会在运行时得到Pod的实际指针，该指针用于
+// 访问Pod的状态信息，从而计算出具体的逻辑。
 type PodAlgorithmFactory func(pod *Pod) PodAlgorithm
 
 func (p *Pod) Tick(slot []float64, mem int) (Load float64, MemUsage int) {
@@ -67,6 +69,10 @@ type PodBuilder struct {
 }
 
 func (builder *PodBuilder) Build() *Pod {
+	if builder.AlgorithmFactory == nil || builder.Controller == nil {
+		panic("Pod必须有AlgorithmFactory和DeploymentController")
+	}
+
 	p := &Pod{
 		Pod: v1.Pod{
 			TypeMeta: apimachineryv1.TypeMeta{
@@ -116,12 +122,14 @@ var (
 	ErrorState PodState = "Error"
 )
 
+type PodEventType string
+
 type PodEvent struct {
 	Who  *Pod
-	What string
+	What PodEventType
 }
 
 const (
-	PodPreemptEvent   = "Preempt"
-	PodTerminateEvent = "Terminate"
+	PodPreemptEvent   = PodEventType("Preempt")
+	PodTerminateEvent = PodEventType("Terminate")
 )

@@ -9,7 +9,7 @@ import (
 
 // Node 集群中的模拟Node。继承Kubernetes的Node，但是字段仅保留与调度有关的信息，也就是Kubernetes调度器使用到的部分。
 type Node struct {
-	*v1.Node
+	v1.Node
 	// CPU核数
 	CoreCount int
 	// 内存大小，以字节为单位
@@ -50,7 +50,7 @@ func (builder *NodeBuilder) Build() *Node {
 	}
 
 	return &Node{
-		Node: &v1.Node{
+		Node: v1.Node{
 			TypeMeta: apimachineryv1.TypeMeta{
 				Kind:       "Node",
 				APIVersion: "v1",

@@ -13,7 +13,7 @@ func NewMockDeploymentController() DeploymentController {
 	return &mockDeploymentController{0}
 }
 
-func (ctrl *mockDeploymentController) Tick() (addPod []Pod, removePod []Pod) {
+func (ctrl *mockDeploymentController) Tick() (addPod []*Pod, removePod []*Pod) {
 	panic("implement me")
 }
 

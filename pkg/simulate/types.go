@@ -5,7 +5,7 @@ package simulate
 // 逻辑。
 type DeploymentController interface {
 	// Tick 返回当前时钟周期所要部署的Pod和删除的Pod
-	Tick() (addPod []Pod, removePod []Pod)
+	Tick() (addPod []*Pod, removePod []*Pod)
 
 	// InformPodEvent 当Pod状态改变后，通知本Controller。决定是否在下一轮Tick时采取行动，如重新部署被抢占或错误的Pod
 	InformPodEvent(event *PodEvent)

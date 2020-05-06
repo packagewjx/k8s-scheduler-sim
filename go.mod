@@ -3,10 +3,11 @@ module github.com/packagewjx/k8s-scheduler-sim
 go 1.14
 
 require (
-    k8s.io/kubernetes v1.18.0
-    k8s.io/api v0.0.0
-    k8s.io/apimachinery v0.0.0
-    k8s.io/client-go v0.0.0
+	github.com/pkg/errors v0.8.1
+	k8s.io/api v0.0.0
+	k8s.io/apimachinery v0.0.0
+	k8s.io/client-go v0.0.0
+	k8s.io/kubernetes v1.18.0
 )
 
 replace (

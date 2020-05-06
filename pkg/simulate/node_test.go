@@ -21,7 +21,7 @@ func TestNodeRun(t *testing.T) {
 		CpuLimit:         1,
 		MemLimit:         100,
 		Controller:       dc,
-		AlgorithmFactory: FactoryMethod(1, 1000),
+		AlgorithmFactory: BatchPodFactory(1, 1000),
 	}
 	for i := 0; i < 10; i++ {
 		podBuilder.Name = fmt.Sprintf("Batch-%d", i)

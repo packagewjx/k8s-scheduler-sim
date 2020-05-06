@@ -74,12 +74,14 @@
 - [ ] 模拟器设计
   - [ ] Pod模拟器设计
     - [x] 初步可运行框架设计
-    - [ ] 整合Kubernetes API的Pod
+    - [x] 整合Kubernetes API的Pod
     - [ ] `client-go` API可访问
   - [ ] Node模拟器设计
     - [x] 模拟节点运行逻辑设计
-    - [ ] 整合Kubernetes API的Node
-    - [ ] `client-go` API可访问
+    - [x] 整合Kubernetes API的Node
+    - [x] `client-go` API可访问
+  - [ ] 事件通知器接口`SharedInformerFactory`与`PodInformer`实现
+  - [ ] client-go接口实现
 - [ ] 监控系统的设计
   - [ ] 监控数据设计
   - [x] 节点监控数据采集

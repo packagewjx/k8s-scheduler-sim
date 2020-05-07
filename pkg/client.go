@@ -3,7 +3,10 @@ package pkg
 import (
 	"context"
 	"errors"
+	"fmt"
+	"github.com/packagewjx/k8s-scheduler-sim/pkg/util"
 	apicorev1 "k8s.io/api/core/v1"
+	"k8s.io/api/policy/v1beta1"
 	apimachineryv1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
@@ -50,6 +53,11 @@ import (
 	storagev1alpha1 "k8s.io/client-go/kubernetes/typed/storage/v1alpha1"
 	storagev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1"
 	"k8s.io/client-go/rest"
+)
+
+var (
+	TopicNode = "node"
+	TopicPod  = "pod"
 )
 
 // For Kubernetes scheduler use only. ONLY implements those used by scheduler.
@@ -335,7 +343,7 @@ func (client *coreV1Client) PersistentVolumeClaims(_ string) corev1.PersistentVo
 }
 
 func (client *coreV1Client) Pods(_ string) corev1.PodInterface {
-	panic("implement me")
+	return &coreV1PodClient{sim: client.sim}
 }
 
 func (client *coreV1Client) PodTemplates(_ string) corev1.PodTemplateInterface {
@@ -375,6 +383,17 @@ func (client *coreV1NodeClient) Update(_ context.Context, node *apicorev1.Node, 
 	for _, simNode := range client.sim.Nodes {
 		if simNode.Name == node.Name {
 			simNode.Node = *node
+
+			// 事件通知
+			event := &watch.Event{
+				Type:   watch.Modified,
+				Object: node,
+			}
+			err := util.GetMessageQueue().Publish(TopicNode, event)
+			if err != nil {
+				fmt.Println(err)
+			}
+
 			return &simNode.Node, nil
 		}
 	}
@@ -385,6 +404,17 @@ func (client *coreV1NodeClient) UpdateStatus(_ context.Context, node *apicorev1.
 	for _, simNode := range client.sim.Nodes {
 		if simNode.Name == node.Name {
 			simNode.Node.Status = node.Status
+
+			// 事件通知
+			event := &watch.Event{
+				Type:   watch.Modified,
+				Object: node,
+			}
+			err := util.GetMessageQueue().Publish(TopicNode, event)
+			if err != nil {
+				fmt.Println(err)
+			}
+
 			return &simNode.Node, nil
 		}
 	}
@@ -427,7 +457,7 @@ func (client *coreV1NodeClient) List(_ context.Context, _ apimachineryv1.ListOpt
 }
 
 func (client *coreV1NodeClient) Watch(_ context.Context, _ apimachineryv1.ListOptions) (watch.Interface, error) {
-	panic("Using this interface is not allowed.")
+	return util.GetMessageQueue().Subscribe(TopicNode)
 }
 
 func (client *coreV1NodeClient) Patch(_ context.Context, _ string, _ types.PatchType, _ []byte, _ apimachineryv1.PatchOptions, _ ...string) (result *apicorev1.Node, err error) {
@@ -436,4 +466,64 @@ func (client *coreV1NodeClient) Patch(_ context.Context, _ string, _ types.Patch
 
 func (client *coreV1NodeClient) PatchStatus(_ context.Context, _ string, _ []byte) (*apicorev1.Node, error) {
 	panic("Using this interface is not allowed.")
+}
+
+type coreV1PodClient struct {
+	sim *SchedSim
+}
+
+func (c *coreV1PodClient) Create(_ context.Context, _ *apicorev1.Pod, _ apimachineryv1.CreateOptions) (*apicorev1.Pod, error) {
+	panic("implement me")
+}
+
+func (c *coreV1PodClient) Update(_ context.Context, _ *apicorev1.Pod, _ apimachineryv1.UpdateOptions) (*apicorev1.Pod, error) {
+	panic("implement me")
+}
+
+func (c *coreV1PodClient) UpdateStatus(_ context.Context, _ *apicorev1.Pod, _ apimachineryv1.UpdateOptions) (*apicorev1.Pod, error) {
+	panic("implement me")
+}
+
+func (c *coreV1PodClient) Delete(_ context.Context, _ string, _ apimachineryv1.DeleteOptions) error {
+	panic("implement me")
+}
+
+func (c *coreV1PodClient) DeleteCollection(_ context.Context, _ apimachineryv1.DeleteOptions, _ apimachineryv1.ListOptions) error {
+	panic("implement me")
+}
+
+func (c *coreV1PodClient) Get(_ context.Context, _ string, _ apimachineryv1.GetOptions) (*apicorev1.Pod, error) {
+	panic("implement me")
+}
+
+func (c *coreV1PodClient) List(_ context.Context, _ apimachineryv1.ListOptions) (*apicorev1.PodList, error) {
+	panic("implement me")
+}
+
+func (c *coreV1PodClient) Watch(_ context.Context, _ apimachineryv1.ListOptions) (watch.Interface, error) {
+	panic("implement me")
+}
+
+func (c *coreV1PodClient) Patch(_ context.Context, _ string, _ types.PatchType, _ []byte, _ apimachineryv1.PatchOptions, _ ...string) (result *apicorev1.Pod, err error) {
+	panic("implement me")
+}
+
+func (c *coreV1PodClient) GetEphemeralContainers(_ context.Context, _ string, _ apimachineryv1.GetOptions) (*apicorev1.EphemeralContainers, error) {
+	panic("implement me")
+}
+
+func (c *coreV1PodClient) UpdateEphemeralContainers(_ context.Context, _ string, _ *apicorev1.EphemeralContainers, _ apimachineryv1.UpdateOptions) (*apicorev1.EphemeralContainers, error) {
+	panic("implement me")
+}
+
+func (c *coreV1PodClient) Bind(_ context.Context, _ *apicorev1.Binding, _ apimachineryv1.CreateOptions) error {
+	panic("implement me")
+}
+
+func (c *coreV1PodClient) Evict(_ context.Context, _ *v1beta1.Eviction) error {
+	panic("implement me")
+}
+
+func (c *coreV1PodClient) GetLogs(_ string, _ *apicorev1.PodLogOptions) *rest.Request {
+	panic("implement me")
 }

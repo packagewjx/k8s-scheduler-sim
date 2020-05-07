@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/mock"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/simulate"
+	"github.com/packagewjx/k8s-scheduler-sim/pkg/util"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/scheduling/v1"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/scheduler"
 )
+
+var DefaultNamespace = ""
 
 type SchedSim struct {
 	Client                kubernetes.Interface
@@ -33,9 +37,22 @@ func NewSchedulerSimulator(ctx context.Context, nodeCount int, nodeBuilder *simu
 	sim.Client = client
 
 	nodes := make([]*simulate.Node, nodeCount)
+	err = util.GetMessageQueue().NewTopic(TopicNode)
+	if err != nil {
+		fmt.Println(err)
+	}
 	for i := 0; i < nodeCount; i++ {
 		nodeBuilder.Name = fmt.Sprintf("SimNode-%d", i)
 		nodes[i] = nodeBuilder.Build()
+
+		event := &watch.Event{
+			Type:   watch.Added,
+			Object: nodes[i],
+		}
+		err = util.GetMessageQueue().Publish(TopicNode, event)
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 
 	return sim, nil

@@ -5,6 +5,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestQueue(t *testing.T) {
@@ -23,7 +24,11 @@ func TestQueue(t *testing.T) {
 			go func(ch <-chan watch.Event) {
 				defer wg.Done()
 				for k := 0; k < recvTimes; k++ {
-					<-ch
+					select {
+					case <-ch:
+					case <-time.After(100 * time.Millisecond):
+						t.Errorf("没有收到消息")
+					}
 				}
 			}(resultChan)
 		}

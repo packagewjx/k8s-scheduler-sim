@@ -48,7 +48,7 @@ func TestNodeInformer(t *testing.T) {
 			GenerateName: oldGenerateName,
 		},
 	}
-	nodeClient.Create(context.TODO(), testNode, metav1.CreateOptions{})
+	_, _ = nodeClient.Create(context.TODO(), testNode, metav1.CreateOptions{})
 	select {
 	case <-ch:
 	case <-time.After(100 * time.Millisecond):
@@ -58,7 +58,7 @@ func TestNodeInformer(t *testing.T) {
 
 	newGenerateName := "test-100"
 	testNode.GenerateName = newGenerateName
-	nodeClient.Update(context.TODO(), testNode, metav1.UpdateOptions{})
+	_, _ = nodeClient.Update(context.TODO(), testNode, metav1.UpdateOptions{})
 	for i := 0; i < 2; i++ {
 		select {
 		case n := <-ch:
@@ -67,7 +67,6 @@ func TestNodeInformer(t *testing.T) {
 					t.Error("旧对象字段不对")
 				}
 			} else {
-				fmt.Println("haha")
 				if n.GenerateName != newGenerateName {
 					t.Error("新对象字段不对")
 				}
@@ -77,14 +76,7 @@ func TestNodeInformer(t *testing.T) {
 		}
 	}
 
-	nodeClient.UpdateStatus(context.TODO(), testNode, metav1.UpdateOptions{})
-	select {
-	case <-ch:
-	case <-time.After(100 * time.Millisecond):
-		t.Error("更新通知失败")
-	}
-
-	nodeClient.Delete(context.TODO(), "", metav1.DeleteOptions{})
+	_ = nodeClient.Delete(context.TODO(), "", metav1.DeleteOptions{})
 	select {
 	case <-ch:
 	case <-time.After(100 * time.Millisecond):
@@ -92,5 +84,4 @@ func TestNodeInformer(t *testing.T) {
 	}
 
 	stopCh <- struct{}{}
-	fmt.Println("haha")
 }

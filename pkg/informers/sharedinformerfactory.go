@@ -29,14 +29,13 @@ import (
 	"reflect"
 )
 
-func NewSharedInformerFactory(onInformerCreated func(trigger UpdateTrigger), client kubernetes.Interface) informers.SharedInformerFactory {
-	return &sharedInformerFactory{OnInformerCreated: onInformerCreated, client: client, informers: make(map[reflect.Type]cache.SharedIndexInformer)}
+func NewSharedInformerFactory(client kubernetes.Interface) informers.SharedInformerFactory {
+	return &sharedInformerFactory{client: client, informers: make(map[reflect.Type]cache.SharedIndexInformer)}
 }
 
 type sharedInformerFactory struct {
-	OnInformerCreated func(trigger UpdateTrigger)
-	informers         map[reflect.Type]cache.SharedIndexInformer
-	client            kubernetes.Interface
+	informers map[reflect.Type]cache.SharedIndexInformer
+	client    kubernetes.Interface
 }
 
 func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {

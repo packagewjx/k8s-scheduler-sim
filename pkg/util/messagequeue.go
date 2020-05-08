@@ -6,6 +6,8 @@ import (
 	"sync"
 )
 
+const messageQueueSize = 16
+
 type MessageQueue interface {
 	// NewTopic 创建一个新的沟通话题，让订阅者和发布者进行沟通
 	NewTopic(topic string) error
@@ -21,8 +23,8 @@ var queue MessageQueue
 
 func init() {
 	queue = &messageQueueImpl{
-		listeners: make(map[string]chan *operation),
-		lock:      sync.Mutex{},
+		dispatchers: make(map[string]chan *operation),
+		lock:        sync.Mutex{},
 	}
 }
 
@@ -31,9 +33,11 @@ func GetMessageQueue() MessageQueue {
 }
 
 type messageQueueImpl struct {
-	listeners map[string]chan *operation
-	lock      sync.Mutex
+	dispatchers map[string]chan *operation
+	lock        sync.Mutex
 }
+
+var _ MessageQueue = &messageQueueImpl{}
 
 func (queue *messageQueueImpl) Shutdown() {
 	queue.lock.Lock()
@@ -43,11 +47,11 @@ func (queue *messageQueueImpl) Shutdown() {
 		what: opShutdown,
 		arg:  nil,
 	}
-	for _, ch := range queue.listeners {
+	for _, ch := range queue.dispatchers {
 		ch <- ev
 		close(ch)
 	}
-	queue.listeners = map[string]chan *operation{}
+	queue.dispatchers = map[string]chan *operation{}
 }
 
 type operation struct {
@@ -65,11 +69,11 @@ var (
 )
 
 func (queue *messageQueueImpl) NewTopic(topic string) error {
-	if _, ok := queue.listeners[topic]; !ok {
+	if _, ok := queue.dispatchers[topic]; !ok {
 		queue.lock.Lock()
-		if _, ok := queue.listeners[topic]; !ok {
+		if _, ok := queue.dispatchers[topic]; !ok {
 			ch := make(chan *operation)
-			queue.listeners[topic] = ch
+			queue.dispatchers[topic] = ch
 			go worker(ch)
 		}
 		queue.lock.Unlock()
@@ -119,7 +123,7 @@ func worker(ch chan *operation) {
 }
 
 func (queue *messageQueueImpl) Subscribe(topic string) (watch.Interface, error) {
-	if _, ok := queue.listeners[topic]; !ok {
+	if _, ok := queue.dispatchers[topic]; !ok {
 		return nil, fmt.Errorf("没有话题%s", topic)
 	}
 	return &watcher{
@@ -130,7 +134,7 @@ func (queue *messageQueueImpl) Subscribe(topic string) (watch.Interface, error) 
 }
 
 func (queue *messageQueueImpl) Publish(topic string, event *watch.Event) error {
-	if _, ok := queue.listeners[topic]; !ok {
+	if _, ok := queue.dispatchers[topic]; !ok {
 		return fmt.Errorf("没有话题%s", topic)
 	}
 
@@ -138,17 +142,17 @@ func (queue *messageQueueImpl) Publish(topic string, event *watch.Event) error {
 		what: opInform,
 		arg:  event,
 	}
-	queue.listeners[topic] <- op
+	queue.dispatchers[topic] <- op
 	return nil
 }
 
 func (queue *messageQueueImpl) newChannel(topic string) chan watch.Event {
-	c := make(chan watch.Event)
+	c := make(chan watch.Event, messageQueueSize)
 	op := &operation{
 		what: opAdd,
 		arg:  c,
 	}
-	queue.listeners[topic] <- op
+	queue.dispatchers[topic] <- op
 	return c
 }
 
@@ -158,7 +162,7 @@ func (queue *messageQueueImpl) removeTopicChannels(topic string, chans []chan wa
 		arg:  chans,
 	}
 
-	queue.listeners[topic] <- op
+	queue.dispatchers[topic] <- op
 }
 
 type watcher struct {

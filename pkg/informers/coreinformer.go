@@ -48,8 +48,7 @@ func (c *coreInformer) PersistentVolumeClaims() corev1.PersistentVolumeClaimInfo
 }
 
 func (c *coreInformer) Pods() corev1.PodInformer {
-	p := &podInformer{client: c.client}
-	return p
+	return newPodInformer(c.client, c.factory)
 }
 
 func (c *coreInformer) PodTemplates() corev1.PodTemplateInformer {

@@ -23,7 +23,10 @@ var podKeyFunc cache.KeyFunc = func(obj interface{}) (string, error) {
 }
 
 func newPodInformer(client kubernetes.Interface, factory informers.SharedInformerFactory) v1.PodInformer {
-
+	return &podInformer{
+		client:  client,
+		factory: factory,
+	}
 }
 
 func (p *podInformer) defaultInformer(client kubernetes.Interface, _ time.Duration) cache.SharedIndexInformer {

@@ -5,6 +5,7 @@ import (
 	"github.com/packagewjx/k8s-scheduler-sim/pkg"
 	apicorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
 	v1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -16,6 +17,29 @@ import (
 type podInformer struct {
 	client  kubernetes.Interface
 	factory informers.SharedInformerFactory
+}
+
+func (p *podInformer) Get(name string) (*apicorev1.Pod, error) {
+	return p.client.CoreV1().Pods(pkg.DefaultNamespace).Get(context.TODO(), name, metav1.GetOptions{})
+}
+
+func (p *podInformer) List(selector labels.Selector) (ret []*apicorev1.Pod, err error) {
+	podList, err := p.client.CoreV1().Pods(pkg.DefaultNamespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return
+	}
+
+	ret = make([]*apicorev1.Pod, 0, len(podList.Items))
+	for _, pod := range podList.Items {
+		if selector.Matches(labels.Set(pod.Labels)) {
+			ret = append(ret, &pod)
+		}
+	}
+	return
+}
+
+func (p *podInformer) Pods(namespace string) listerv1.PodNamespaceLister {
+	return p
 }
 
 var podKeyFunc cache.KeyFunc = func(obj interface{}) (string, error) {
@@ -48,9 +72,5 @@ func (p *podInformer) Informer() cache.SharedIndexInformer {
 }
 
 func (p *podInformer) Lister() listerv1.PodLister {
-	panic("implement me")
-}
-
-func (p *podInformer) Tick() {
-	panic("implement me")
+	return p
 }

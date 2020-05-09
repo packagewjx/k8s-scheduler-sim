@@ -3,14 +3,12 @@ package pkg
 import (
 	"context"
 	"fmt"
+	"github.com/packagewjx/k8s-scheduler-sim/pkg/informers"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/mock"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/simulate"
-	"github.com/packagewjx/k8s-scheduler-sim/pkg/util"
-	"github.com/pkg/errors"
-	v1 "k8s.io/api/scheduling/v1"
-	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/informers"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/scheduler"
 )
 
@@ -18,50 +16,66 @@ var DefaultNamespace = ""
 
 type SchedSim struct {
 	Client                kubernetes.Interface
-	Nodes                 []*simulate.Node
-	PendingPods           []*simulate.Pod
-	DeploymentControllers []*simulate.DeploymentController
-	PriorityClasses       []*v1.PriorityClass
+	Nodes                 cache.Store
+	DeploymentControllers cache.Store
+	PriorityClasses       cache.Store
+	Pods                  cache.Store
 	Scheduler             *scheduler.Scheduler
+	cancelFunc            context.CancelFunc
 }
 
-func NewSchedulerSimulator(ctx context.Context, nodeCount int, nodeBuilder *simulate.NodeBuilder) (*SchedSim, error) {
-	sim := &SchedSim{}
-	client := &SimClient{Sim: sim}
-	sched, err := buildScheduler(ctx, client)
-	if err != nil {
-		return nil, errors.Wrap(err, "error building scheduler")
+var (
+	podKeyFunc cache.KeyFunc = func(obj interface{}) (string, error) {
+		if pod, ok := obj.(*simulate.Pod); ok {
+			return pod.Name, nil
+		} else if pod, ok := obj.(*v1.Pod); ok {
+			return pod.Name, nil
+		} else {
+			return "", fmt.Errorf("error getting key from %v", obj)
+		}
+	}
+	nodeKeyFunc cache.KeyFunc = func(obj interface{}) (string, error) {
+		if node, ok := obj.(*simulate.Node); ok {
+			return node.Name, nil
+		} else if node, ok := obj.(*v1.Pod); ok {
+			return node.Name, nil
+		} else {
+			return "", fmt.Errorf("error getting key from %v", obj)
+		}
+	}
+)
+
+func NewSchedulerSimulator() *SchedSim {
+	rootCtx, cancel := context.WithCancel(context.Background())
+	sim := &SchedSim{
+		Client:                nil,
+		Nodes:                 cache.NewStore(nodeKeyFunc),
+		DeploymentControllers: nil,
+		PriorityClasses:       nil,
+		Pods:                  cache.NewStore(podKeyFunc),
+		Scheduler:             nil,
+		cancelFunc:            cancel,
 	}
 
-	sim.Scheduler = sched
+	client := &simClient{sim: sim}
 	sim.Client = client
 
-	nodes := make([]*simulate.Node, nodeCount)
-	err = util.GetMessageQueue().NewTopic(TopicNode)
+	sched, err := buildScheduler(rootCtx, client)
 	if err != nil {
-		fmt.Println(err)
+		panic(err)
 	}
-	for i := 0; i < nodeCount; i++ {
-		nodeBuilder.Name = fmt.Sprintf("SimNode-%d", i)
-		nodes[i] = nodeBuilder.Build()
+	sim.Scheduler = sched
 
-		event := &watch.Event{
-			Type:   watch.Added,
-			Object: nodes[i],
-		}
-		err = util.GetMessageQueue().Publish(TopicNode, event)
-		if err != nil {
-			fmt.Println(err)
-		}
-	}
-
-	return sim, nil
+	return sim
 }
 
 func buildScheduler(ctx context.Context, client kubernetes.Interface) (*scheduler.Scheduler, error) {
-	return scheduler.New(client, informers.NewSharedInformerFactory(client, 0), scheduler.NewPodInformer(client, 0), mock.SimRecorderFactory, ctx.Done())
+	factory := informers.NewSharedInformerFactory(client)
+	podInformer := informers.NewPodInformer(client, factory)
+	go podInformer.Informer().Run(ctx.Done())
+	return scheduler.New(client, factory, podInformer, mock.SimRecorderFactory, ctx.Done())
 }
 
 func (sim *SchedSim) Run() {
-
+	defer sim.cancelFunc()
 }

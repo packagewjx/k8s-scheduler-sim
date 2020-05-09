@@ -89,3 +89,13 @@
   - [ ] 监控数据设计
   - [x] 节点监控数据采集
   - [ ] 监控数据统计
+  
+## 尚未计划实现的调度器功能
+
+Kubernetes调度器拥有许多的Predicates和Priority插件，能够查看集群几乎所有资源的状态。由于本系统专注于测试调度器对集群资源
+利用率的提升，以及性能的提升方面，因此与这些无关的资源接口将不被实现，以下列出部分调度器插件目前使用的接口
+
+- 存储相关接口
+  - StorageClass
+  - PersistentVolume
+  - PersistentVolumeClaim

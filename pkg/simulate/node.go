@@ -3,18 +3,15 @@ package simulate
 import (
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/metrics"
 	v1 "k8s.io/api/core/v1"
-	apimachineryv1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"time"
+)
+
+const (
+	NodeAnnotationCoreScheduler = "github.com/packagewjx/corealgorithm"
 )
 
 // Node 集群中的模拟Node。继承Kubernetes的Node，但是字段仅保留与调度有关的信息，也就是Kubernetes调度器使用到的部分。
 type Node struct {
 	v1.Node
-	// CPU核数
-	CoreCount int
-	// 内存大小，以字节为单位
-	MemorySize int
-	// 调度器，用于分配CPU时间片
 	Scheduler CoreScheduler
 	// 本节点上的Pod
 	Pods map[string]*Pod
@@ -22,69 +19,7 @@ type Node struct {
 	CpuState [][]*RunEntity
 
 	// 上一轮的CPU使用百分比，用于查看是否有资源竞争，模拟高资源竞争时CPU处理能力的下降
-	lastCpuUsage float64
-}
-
-type NodeBuilder struct {
-	Name        string
-	Labels      map[string]string
-	Annotations map[string]string
-	Taints      []v1.Taint
-	CoreCount   int
-	MemorySize  int
-	Scheduler   CoreScheduler
-}
-
-func (builder *NodeBuilder) Build() *Node {
-	labels := builder.Labels
-	if labels == nil {
-		labels = make(map[string]string)
-	}
-	annotations := builder.Annotations
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-	taints := builder.Taints
-	if taints == nil {
-		taints = []v1.Taint{}
-	}
-
-	return &Node{
-		Node: v1.Node{
-			TypeMeta: apimachineryv1.TypeMeta{
-				Kind:       "Node",
-				APIVersion: "v1",
-			},
-			ObjectMeta: apimachineryv1.ObjectMeta{
-				Name:              builder.Name,
-				CreationTimestamp: apimachineryv1.Time{Time: time.Now()},
-				Labels:            labels,
-				Annotations:       annotations,
-				ClusterName:       "Simulator",
-			},
-			Spec: v1.NodeSpec{
-				Unschedulable: false,
-				Taints:        taints,
-			},
-			Status: v1.NodeStatus{
-				Capacity:    nil,
-				Allocatable: nil,
-				Phase:       v1.NodeRunning,
-			},
-		},
-		CoreCount:    builder.CoreCount,
-		CpuState:     make([][]*RunEntity, builder.CoreCount),
-		MemorySize:   builder.MemorySize,
-		Scheduler:    builder.Scheduler,
-		Pods:         make(map[string]*Pod),
-		lastCpuUsage: 0,
-	}
-}
-
-// AddPod 将Pod调度到本节点运行。新的Pod将会在下一次Tick的时候分配时间片运行
-func (n *Node) AddPod(pod *Pod) {
-	n.Pods[pod.Name] = pod
-	pod.Status.Phase = v1.PodRunning
+	LastCpuUsage float64
 }
 
 // 根据节点拥有的Pod，更新当前的节点状态，包括资源使用率，Pod状态等
@@ -118,11 +53,12 @@ func (n *Node) Tick() *metrics.TickMetrics {
 	}
 
 	for i := 0; i < len(terminatedPods); i++ {
+		//通过watch.Interface通知，而不用这个
 		// 通知控制器停止了的Pod
-		terminatedPods[i].Controller.InformPodEvent(&PodEvent{
-			Who:  terminatedPods[i],
-			What: PodTerminateEvent,
-		})
+		//terminatedPods[i].Controller.InformPodEvent(&PodEvent{
+		//	Who:  terminatedPods[i],
+		//	What: PodTerminateEvent,
+		//})
 		// 从本节点移除
 		delete(n.Pods, terminatedPods[i].Name)
 	}
@@ -141,7 +77,7 @@ func (n *Node) Tick() *metrics.TickMetrics {
 	memUsed := 0
 	load := float64(0)
 	for i := 0; i < len(readyPods); i++ {
-		cpuPressureReduction(podResource[i].slot, n.lastCpuUsage)
+		cpuPressureReduction(podResource[i].slot, n.LastCpuUsage)
 		podResource[i].load, podResource[i].memUsage = readyPods[i].Algorithm.Tick(podResource[i].slot, podResource[i].mem)
 
 		// 计算统计
@@ -153,7 +89,9 @@ func (n *Node) Tick() *metrics.TickMetrics {
 
 	// 根据Pod返回的负载信息，计算CPU统计数据
 	cpuUsed := float64(0)
-	for i := 0; i < n.CoreCount; i++ {
+	coreCount, _ := n.Status.Capacity.Cpu().AsInt64()
+	memSize, _ := n.Status.Capacity.Memory().AsInt64()
+	for i := 0; i < int(coreCount); i++ {
 		for j := 0; j < len(cpuState[i]); j++ {
 			entity := cpuState[i][j]
 			podIdx := podIdxMap[entity.Pod]
@@ -161,12 +99,15 @@ func (n *Node) Tick() *metrics.TickMetrics {
 		}
 	}
 
-	cpuUsage := cpuUsed / float64(n.CoreCount)
-	n.lastCpuUsage = cpuUsage
+	cpuUsage := cpuUsed / float64(coreCount)
+	n.LastCpuUsage = cpuUsage
+
+	n.Status.Allocatable.Cpu().Set(coreCount - int64(cpuUsed))
+	n.Status.Allocatable.Memory().Set(memSize - int64(memUsed))
 
 	return &metrics.TickMetrics{
 		CpuUsage: cpuUsage,
-		MemUsage: float64(memUsed) / float64(n.MemorySize),
+		MemUsage: float64(memUsed) / float64(memSize),
 		Load:     load,
 	}
 

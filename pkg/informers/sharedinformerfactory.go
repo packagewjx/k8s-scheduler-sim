@@ -27,22 +27,41 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"reflect"
+	"sync"
 )
 
 func NewSharedInformerFactory(client kubernetes.Interface) informers.SharedInformerFactory {
-	return &sharedInformerFactory{client: client, informers: make(map[reflect.Type]cache.SharedIndexInformer)}
+	return &sharedInformerFactory{
+		client:           client,
+		informers:        make(map[reflect.Type]cache.SharedIndexInformer),
+		startedInformers: make(map[reflect.Type]bool),
+	}
 }
 
 type sharedInformerFactory struct {
-	informers map[reflect.Type]cache.SharedIndexInformer
-	client    kubernetes.Interface
+	started          bool
+	informers        map[reflect.Type]cache.SharedIndexInformer
+	startedInformers map[reflect.Type]bool
+	client           kubernetes.Interface
+	lock             sync.Mutex
 }
 
 func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
-	panic("implement me")
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	for resourceType, informer := range f.informers {
+		if !f.startedInformers[resourceType] {
+			go informer.Run(stopCh)
+			f.startedInformers[resourceType] = true
+		}
+	}
 }
 
 func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internalinterfaces.NewInformerFunc) cache.SharedIndexInformer {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
 	typ := reflect.TypeOf(obj)
 	var informer cache.SharedIndexInformer
 	if informer, ok := f.informers[typ]; ok {
@@ -122,7 +141,7 @@ func (f *sharedInformerFactory) Node() node.Interface {
 }
 
 func (f *sharedInformerFactory) Policy() policy.Interface {
-	panic("implement me")
+	return &policyInformer{}
 }
 
 func (f *sharedInformerFactory) Rbac() rbac.Interface {
@@ -138,5 +157,5 @@ func (f *sharedInformerFactory) Settings() settings.Interface {
 }
 
 func (f *sharedInformerFactory) Storage() storage.Interface {
-	panic("implement me")
+	return &storageInformer{}
 }

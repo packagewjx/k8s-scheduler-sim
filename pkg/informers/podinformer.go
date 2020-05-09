@@ -2,11 +2,11 @@ package informers
 
 import (
 	"context"
-	"github.com/packagewjx/k8s-scheduler-sim/pkg"
 	apicorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
+	coreinformer "k8s.io/client-go/informers/core/v1"
 	v1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	listerv1 "k8s.io/client-go/listers/core/v1"
@@ -14,17 +14,28 @@ import (
 	"time"
 )
 
+const DefaultNamespace = ""
+
 type podInformer struct {
 	client  kubernetes.Interface
 	factory informers.SharedInformerFactory
 }
 
+var _ coreinformer.PodInformer = &podInformer{}
+
+func NewPodInformer(client kubernetes.Interface, factory informers.SharedInformerFactory) coreinformer.PodInformer {
+	return &podInformer{
+		client:  client,
+		factory: factory,
+	}
+}
+
 func (p *podInformer) Get(name string) (*apicorev1.Pod, error) {
-	return p.client.CoreV1().Pods(pkg.DefaultNamespace).Get(context.TODO(), name, metav1.GetOptions{})
+	return p.client.CoreV1().Pods(DefaultNamespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (p *podInformer) List(selector labels.Selector) (ret []*apicorev1.Pod, err error) {
-	podList, err := p.client.CoreV1().Pods(pkg.DefaultNamespace).List(context.TODO(), metav1.ListOptions{})
+	podList, err := p.client.CoreV1().Pods(DefaultNamespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return
 	}
@@ -38,7 +49,7 @@ func (p *podInformer) List(selector labels.Selector) (ret []*apicorev1.Pod, err 
 	return
 }
 
-func (p *podInformer) Pods(namespace string) listerv1.PodNamespaceLister {
+func (p *podInformer) Pods(_ string) listerv1.PodNamespaceLister {
 	return p
 }
 
@@ -54,7 +65,7 @@ func newPodInformer(client kubernetes.Interface, factory informers.SharedInforme
 }
 
 func (p *podInformer) defaultInformer(client kubernetes.Interface, _ time.Duration) cache.SharedIndexInformer {
-	watcher, err := client.CoreV1().Pods(pkg.DefaultNamespace).Watch(context.TODO(), metav1.ListOptions{})
+	watcher, err := client.CoreV1().Pods(DefaultNamespace).Watch(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		panic(err)
 	}

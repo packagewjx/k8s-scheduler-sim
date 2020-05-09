@@ -1,9 +1,13 @@
 package informers
 
 import (
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
 	corev1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
+	listerv1 "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 )
 
 type coreInformer struct {
@@ -40,11 +44,11 @@ func (c *coreInformer) Nodes() corev1.NodeInformer {
 }
 
 func (c *coreInformer) PersistentVolumes() corev1.PersistentVolumeInformer {
-	panic("implement me")
+	return &persistentVolumeInformer{}
 }
 
 func (c *coreInformer) PersistentVolumeClaims() corev1.PersistentVolumeClaimInformer {
-	panic("implement me")
+	return &persistentVolumeClaimInformer{}
 }
 
 func (c *coreInformer) Pods() corev1.PodInformer {
@@ -68,7 +72,7 @@ func (c *coreInformer) Secrets() corev1.SecretInformer {
 }
 
 func (c *coreInformer) Services() corev1.ServiceInformer {
-	panic("implement me")
+	return &serviceInformer{}
 }
 
 func (c *coreInformer) ServiceAccounts() corev1.ServiceAccountInformer {
@@ -77,4 +81,64 @@ func (c *coreInformer) ServiceAccounts() corev1.ServiceAccountInformer {
 
 func (c *coreInformer) V1() corev1.Interface {
 	return c
+}
+
+// persistentVolumeClaimInformer nil informer
+type persistentVolumeClaimInformer struct {
+}
+
+func (p *persistentVolumeClaimInformer) List(selector labels.Selector) (ret []*v1.PersistentVolumeClaim, err error) {
+	panic("implement me")
+}
+
+func (p *persistentVolumeClaimInformer) PersistentVolumeClaims(namespace string) listerv1.PersistentVolumeClaimNamespaceLister {
+	panic("implement me")
+}
+
+func (p *persistentVolumeClaimInformer) Informer() cache.SharedIndexInformer {
+	return &fakeInformer{}
+}
+
+func (p *persistentVolumeClaimInformer) Lister() listerv1.PersistentVolumeClaimLister {
+	return p
+}
+
+// persistentVolumeInformer nil informer
+type persistentVolumeInformer struct {
+}
+
+func (p *persistentVolumeInformer) List(selector labels.Selector) (ret []*v1.PersistentVolume, err error) {
+	panic("implement me")
+}
+
+func (p *persistentVolumeInformer) Get(name string) (*v1.PersistentVolume, error) {
+	panic("implement me")
+}
+
+func (p *persistentVolumeInformer) Informer() cache.SharedIndexInformer {
+	return &fakeInformer{}
+}
+
+func (p *persistentVolumeInformer) Lister() listerv1.PersistentVolumeLister {
+	return p
+}
+
+// serviceInformer nil informer
+type serviceInformer struct {
+}
+
+func (s *serviceInformer) List(selector labels.Selector) (ret []*v1.Service, err error) {
+	panic("implement me")
+}
+
+func (s *serviceInformer) Services(namespace string) listerv1.ServiceNamespaceLister {
+	panic("implement me")
+}
+
+func (s *serviceInformer) Informer() cache.SharedIndexInformer {
+	return &fakeInformer{}
+}
+
+func (s *serviceInformer) Lister() listerv1.ServiceLister {
+	return s
 }

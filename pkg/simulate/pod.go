@@ -2,35 +2,38 @@ package simulate
 
 import (
 	v1 "k8s.io/api/core/v1"
-	apimachineryv1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type Pod struct {
 	v1.Pod
 
-	// CpuLimit CPU限制核数
-	CpuLimit int
+	// CpuLimit CPU限制核数。小数，用于控制最多使用多少个核。小数部分代表能够一个CPU时间片的比例。
+	CpuLimit float64
 
-	// MemLimit Mem限制大小
-	MemLimit int
-
-	// 部署本Pod的DeploymentController
-	Controller DeploymentController
+	// MemLimit Mem限制大小，单位为字节
+	MemLimit int64
 
 	// 具体运行的算法
 	Algorithm PodAlgorithm
 }
 
-// PodAlgorithmFactory 构造Pod核心算法的工厂方法，为了让算法能够访问Pod，工厂方法会在运行时得到Pod的实际指针，该指针用于
-// 访问Pod的状态信息，从而计算出具体的逻辑。
-type PodAlgorithmFactory func(pod *Pod) PodAlgorithm
+const (
+	PodAnnotationCpuLimit             = "github.com/packagewjx/cpulimit"
+	PodAnnotationMemLimit             = "github.com/packagewjx/memlimit"
+	PodAnnotationAlgorithm            = "github.com/packagewjx/algorithm"
+	PodAnnotationInitialState         = "github.com/packagewjx/initstate"
+	PodAnnotationDeploymentController = "github.com/packagewjx/deploymentcontroller"
+)
 
-func (p *Pod) Tick(slot []float64, mem int) (Load float64, MemUsage int) {
-	return p.Algorithm.Tick(slot, mem)
-}
-
-func (p *Pod) ResourceRequest() (cpu int, mem int) {
-	return p.Algorithm.ResourceRequest()
+func (p *Pod) DeepCopyObject() runtime.Object {
+	corePodClone := p.Pod.DeepCopy()
+	return &Pod{
+		Pod:       *corePodClone,
+		CpuLimit:  p.CpuLimit,
+		MemLimit:  p.MemLimit,
+		Algorithm: p.Algorithm,
+	}
 }
 
 type PodAlgorithm interface {
@@ -46,81 +49,19 @@ type PodAlgorithm interface {
 	// cpu 节点CPU数量。注意不能超过本Pod的限制。
 	// mem 节点空闲内存数量。这部分内存尚未使用，而另一部分内存则被Pod占用。Pod可以选择提高Mem，也可以降低Mem使用。
 	//     不能超过本Pod的限制。
-	ResourceRequest() (cpu int, mem int)
+	ResourceRequest() (cpu float64, mem int)
 }
 
-type PodBuilder struct {
-	Name                      string
-	Labels                    map[string]string
-	Annotations               map[string]string
-	NodeSelector              map[string]string
-	NodeName                  string
-	Affinity                  *v1.Affinity
-	SchedulerName             string
-	Toleration                []v1.Toleration
-	PriorityClassName         string
-	PreemptionPolicy          *v1.PreemptionPolicy
-	TopologySpreadConstraints []v1.TopologySpreadConstraint
+type PodAlgorithmFactory func(stateJson string, pod *Pod) (PodAlgorithm, error)
 
-	CpuLimit         int
-	MemLimit         int
-	Controller       DeploymentController
-	AlgorithmFactory PodAlgorithmFactory
+var podAlgorithmMap = map[string]PodAlgorithmFactory{
+	BatchPodName: BatchPodFactory,
 }
 
-func (builder *PodBuilder) Build() *Pod {
-	if builder.AlgorithmFactory == nil || builder.Controller == nil {
-		panic("Pod必须有AlgorithmFactory和DeploymentController")
-	}
-
-	p := &Pod{
-		Pod: v1.Pod{
-			TypeMeta: apimachineryv1.TypeMeta{
-				Kind:       "Pod",
-				APIVersion: "v1",
-			},
-			ObjectMeta: apimachineryv1.ObjectMeta{
-				Name:              builder.Name,
-				CreationTimestamp: apimachineryv1.Time{},
-				Labels:            builder.Labels,
-				Annotations:       builder.Annotations,
-				ClusterName:       "Simulator",
-			},
-			Spec: v1.PodSpec{
-				NodeSelector:              builder.NodeSelector,
-				NodeName:                  builder.NodeName,
-				Affinity:                  builder.Affinity,
-				SchedulerName:             builder.SchedulerName,
-				Tolerations:               builder.Toleration,
-				PriorityClassName:         builder.PriorityClassName,
-				Priority:                  nil,
-				PreemptionPolicy:          builder.PreemptionPolicy,
-				TopologySpreadConstraints: builder.TopologySpreadConstraints,
-			},
-			Status: v1.PodStatus{
-				Phase:             v1.PodPending,
-				NominatedNodeName: "",
-				StartTime:         nil,
-				QOSClass:          "",
-			},
-		},
-		CpuLimit:   builder.CpuLimit,
-		MemLimit:   builder.MemLimit,
-		Controller: builder.Controller,
-	}
-
-	p.Algorithm = builder.AlgorithmFactory(p)
-	return p
+func GetPodAlgorithmFactory(name string) (factory PodAlgorithmFactory, exist bool) {
+	factory, exist = podAlgorithmMap[name]
+	return
 }
-
-type PodState string
-
-var (
-	RunningState   PodState = "Running"
-	TerminateState PodState = "Terminate"
-	// ErrorState 代表容器进入了不可恢复的错误状态。通常导致容器无法提供服务，并且无法自行恢复
-	ErrorState PodState = "Error"
-)
 
 type PodEventType string
 

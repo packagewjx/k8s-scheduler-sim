@@ -1,6 +1,10 @@
 package simulate
 
-import v1 "k8s.io/api/core/v1"
+import (
+	"encoding/json"
+	"github.com/pkg/errors"
+	v1 "k8s.io/api/core/v1"
+)
 
 // batchPodAlgorithm 模拟批处理任务的Pod，默认一直在跑任务，因此负载一直为1，内存使用基本固定
 type batchPodAlgorithm struct {
@@ -9,17 +13,28 @@ type batchPodAlgorithm struct {
 	TotalTick float64
 }
 
-func BatchPodFactory(memUsage int, totalTick float64) PodAlgorithmFactory {
-	return func(pod *Pod) PodAlgorithm {
-		return &batchPodAlgorithm{
-			Pod:       pod,
-			MemUsage:  memUsage,
-			TotalTick: totalTick,
-		}
-	}
+type batchPodState struct {
+	MemUsage  int
+	TotalTick float64
 }
 
-func (alg *batchPodAlgorithm) ResourceRequest() (cpu int, mem int) {
+const BatchPodName = "BatchPod"
+
+var BatchPodFactory PodAlgorithmFactory = func(stateJson string, pod *Pod) (PodAlgorithm, error) {
+	state := &batchPodState{}
+	err := json.Unmarshal([]byte(stateJson), state)
+	if err != nil {
+		return nil, errors.Wrap(err, "Error parsing state json")
+	}
+
+	return &batchPodAlgorithm{
+		Pod:       pod,
+		MemUsage:  state.MemUsage,
+		TotalTick: state.TotalTick,
+	}, nil
+}
+
+func (alg *batchPodAlgorithm) ResourceRequest() (cpu float64, mem int) {
 	return alg.Pod.CpuLimit, alg.MemUsage
 }
 

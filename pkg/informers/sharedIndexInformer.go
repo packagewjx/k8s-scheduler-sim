@@ -4,6 +4,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
+	"sync"
 	"time"
 )
 
@@ -20,8 +21,11 @@ type sharedIndexInformer struct {
 	watcher       watch.Interface
 	store         cache.Store
 	listenerChan  chan cache.ResourceEventHandler
+	listeners     []cache.ResourceEventHandler
 	channelClosed bool
+	isStarted     bool
 	isStop        bool
+	lock          sync.Mutex
 }
 
 func (s *sharedIndexInformer) AddEventHandler(handler cache.ResourceEventHandler) {
@@ -34,11 +38,17 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler cache.Reso
 			close(s.listenerChan)
 			s.channelClosed = true
 		}
-		// 停止后将不再接收任何
+		// 停止后将不再接收任何新的监听器
 		return
 	}
+	if s.isStarted {
+		s.listenerChan <- handler
+	} else {
+		s.lock.Lock()
+		s.listeners = append(s.listeners, handler)
+		s.lock.Unlock()
+	}
 
-	s.listenerChan <- handler
 }
 
 func (s *sharedIndexInformer) GetStore() cache.Store {
@@ -50,7 +60,9 @@ func (s *sharedIndexInformer) GetController() cache.Controller {
 }
 
 func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
-	listeners := make([]cache.ResourceEventHandler, 0, 10)
+	logrus.Debug("SharedIndexInformer starting")
+
+	s.isStarted = true
 	resultChan := s.watcher.ResultChan()
 	for {
 		logrus.Trace("Waiting to receive")
@@ -74,8 +86,8 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 				}
 
 				// 通知各个监听器
-				for i := 0; i < len(listeners); i++ {
-					listeners[i].OnAdd(ev.Object)
+				for _, listener := range s.listeners {
+					listener.OnAdd(ev.Object)
 				}
 			case watch.Modified:
 				logrus.Debugf("Received modified event, with object: %v", ev.Object)
@@ -98,7 +110,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 					logrus.Errorf("Error storing object %v", ev.Object)
 				}
 
-				for _, listener := range listeners {
+				for _, listener := range s.listeners {
 					listener.OnUpdate(oldVal, ev.Object)
 				}
 			case watch.Deleted:
@@ -109,7 +121,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 					logrus.Errorf("Error deleting object %v", ev.Object)
 				}
 
-				for _, listener := range listeners {
+				for _, listener := range s.listeners {
 					listener.OnDelete(ev.Object)
 				}
 			case watch.Error:
@@ -117,7 +129,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 			}
 		case listener := <-s.listenerChan:
 			logrus.Debug("Added new listener")
-			listeners = append(listeners, listener)
+			s.listeners = append(s.listeners, listener)
 		}
 	}
 }

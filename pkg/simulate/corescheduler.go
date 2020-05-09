@@ -8,15 +8,29 @@ type CoreScheduler interface {
 	Schedule(readyPods []*Pod, cpuState [][]*RunEntity) [][]*RunEntity
 }
 
-func NewFairScheduler() CoreScheduler {
-	return &FairScheduler{}
+const (
+	FairScheduler = "fairScheduler"
+)
+
+var schedulerMap = map[string]CoreScheduler{
+	FairScheduler: &fairScheduler{},
 }
 
-// FairScheduler 是完全公平的调度器，不会理会Priority的限制，完全公平的将一个CPU分配给该所有将在该CPU上运行的Pod使用
-type FairScheduler struct {
+func GetCoreScheduler(name string) (scheduler CoreScheduler, exist bool) {
+	scheduler, exist = schedulerMap[name]
+	return
 }
 
-func (s *FairScheduler) Schedule(readyPods []*Pod, cpuState [][]*RunEntity) [][]*RunEntity {
+func RegisterNewCoreScheduler(name string, scheduler CoreScheduler) {
+	schedulerMap[name] = scheduler
+}
+
+// fairScheduler 是完全公平的调度器，不会理会Priority的限制，完全公平的将一个CPU分配给该所有将在该CPU上运行的Pod使用。
+// cpu的小数部分将被忽略
+type fairScheduler struct {
+}
+
+func (s *fairScheduler) Schedule(readyPods []*Pod, cpuState [][]*RunEntity) [][]*RunEntity {
 	totalCpu := len(cpuState)
 
 	// 使用RoundRobin策略
@@ -31,13 +45,13 @@ func (s *FairScheduler) Schedule(readyPods []*Pod, cpuState [][]*RunEntity) [][]
 		cpu, _ := readyPods[i].Algorithm.ResourceRequest()
 		cpuLimit := readyPods[i].CpuLimit
 		// 检查不能超过界限，也不能超过节点的CPU数
-		if cpu > totalCpu {
-			cpu = totalCpu
+		if int(cpu) > totalCpu {
+			cpu = float64(totalCpu)
 		}
 		if cpu > cpuLimit {
 			cpu = cpuLimit
 		}
-		for j := 0; j < cpu; j++ {
+		for j := 0; j < int(cpu); j++ {
 			newState[cpuIdx] = append(newState[cpuIdx], &RunEntity{
 				Pod:  readyPods[i],
 				Slot: 0,

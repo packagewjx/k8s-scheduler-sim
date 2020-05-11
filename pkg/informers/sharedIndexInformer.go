@@ -8,8 +8,12 @@ import (
 	"time"
 )
 
+// Please Note there is a race condition where the creation of resultChan will happen after the first event publishing,
+// causing lost of event. To prevent this, wait for some times after starting the factory or Run before using any
+//kubernetes.Interface function in order to let the informer subscribe topic first.
 func NewSharedIndexInformer(watcher watch.Interface, keyFunc cache.KeyFunc) (cache.SharedIndexInformer, error) {
 	return &sharedIndexInformer{
+		keyFunc:      keyFunc,
 		watcher:      watcher,
 		listenerChan: make(chan cache.ResourceEventHandler),
 		store:        cache.NewStore(keyFunc),
@@ -18,6 +22,7 @@ func NewSharedIndexInformer(watcher watch.Interface, keyFunc cache.KeyFunc) (cac
 }
 
 type sharedIndexInformer struct {
+	keyFunc       cache.KeyFunc
 	watcher       watch.Interface
 	store         cache.Store
 	listenerChan  chan cache.ResourceEventHandler
@@ -87,12 +92,13 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 
 				// 通知各个监听器
 				for _, listener := range s.listeners {
+					logrus.Tracef("Notifying listener %p", &listener)
 					listener.OnAdd(ev.Object)
 				}
 			case watch.Modified:
 				logrus.Debugf("Received modified event, with object: %v", ev.Object)
 
-				key, err := nodeKeyFunc(ev.Object)
+				key, err := s.keyFunc(ev.Object)
 				if err != nil {
 					logrus.Errorf("Error getting key for object %v : %v", ev.Object, err)
 				}
@@ -111,6 +117,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 				}
 
 				for _, listener := range s.listeners {
+					logrus.Tracef("Notifying listener %p", &listener)
 					listener.OnUpdate(oldVal, ev.Object)
 				}
 			case watch.Deleted:
@@ -122,13 +129,14 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 				}
 
 				for _, listener := range s.listeners {
+					logrus.Tracef("Notifying listener %p", &listener)
 					listener.OnDelete(ev.Object)
 				}
 			case watch.Error:
 				logrus.Errorf("Received Error Event: %v", ev.Object)
 			}
 		case listener := <-s.listenerChan:
-			logrus.Debug("Added new listener")
+			logrus.Debugf("Added new listener %p", &listener)
 			s.listeners = append(s.listeners, listener)
 		}
 	}

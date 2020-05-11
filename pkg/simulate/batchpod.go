@@ -22,9 +22,11 @@ const BatchPodName = "BatchPod"
 
 var BatchPodFactory PodAlgorithmFactory = func(stateJson string, pod *Pod) (PodAlgorithm, error) {
 	state := &batchPodState{}
-	err := json.Unmarshal([]byte(stateJson), state)
-	if err != nil {
-		return nil, errors.Wrap(err, "Error parsing state json")
+	if stateJson != "" {
+		err := json.Unmarshal([]byte(stateJson), state)
+		if err != nil {
+			return nil, errors.Wrap(err, "Error parsing state json")
+		}
 	}
 
 	return &batchPodAlgorithm{

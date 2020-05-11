@@ -23,13 +23,6 @@ type podInformer struct {
 
 var _ coreinformer.PodInformer = &podInformer{}
 
-func NewPodInformer(client kubernetes.Interface, factory informers.SharedInformerFactory) coreinformer.PodInformer {
-	return &podInformer{
-		client:  client,
-		factory: factory,
-	}
-}
-
 func (p *podInformer) Get(name string) (*apicorev1.Pod, error) {
 	return p.client.CoreV1().Pods(DefaultNamespace).Get(context.TODO(), name, metav1.GetOptions{})
 }

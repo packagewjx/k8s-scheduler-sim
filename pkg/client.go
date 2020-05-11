@@ -618,7 +618,7 @@ func (c *coreV1PodClient) Create(_ context.Context, pod *apicorev1.Pod, _ apimac
 }
 
 func (c *coreV1PodClient) Update(_ context.Context, pod *apicorev1.Pod, _ apimachineryv1.UpdateOptions) (*apicorev1.Pod, error) {
-	item, exists, err := c.sim.Nodes.Get(pod)
+	item, exists, err := c.sim.Pods.Get(pod)
 	if !exists {
 		return nil, fmt.Errorf("no pod %s", pod.Name)
 	}
@@ -629,7 +629,7 @@ func (c *coreV1PodClient) Update(_ context.Context, pod *apicorev1.Pod, _ apimac
 	simPod := item.(*simulate.Pod)
 	simPod.Pod = *(pod.DeepCopy())
 
-	err = c.sim.Nodes.Update(simPod)
+	err = c.sim.Pods.Update(simPod)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("error updating pod %s", pod.Name))
 	}
@@ -647,7 +647,7 @@ func (c *coreV1PodClient) Update(_ context.Context, pod *apicorev1.Pod, _ apimac
 }
 
 func (c *coreV1PodClient) UpdateStatus(_ context.Context, pod *apicorev1.Pod, _ apimachineryv1.UpdateOptions) (*apicorev1.Pod, error) {
-	item, exists, err := c.sim.Nodes.Get(pod)
+	item, exists, err := c.sim.Pods.Get(pod)
 	if !exists {
 		return nil, fmt.Errorf("no pod %s", pod.Name)
 	}
@@ -658,7 +658,7 @@ func (c *coreV1PodClient) UpdateStatus(_ context.Context, pod *apicorev1.Pod, _ 
 	simPod := item.(*simulate.Pod)
 	simPod.Pod.Status = *(pod.Status.DeepCopy())
 
-	err = c.sim.Nodes.Update(simPod)
+	err = c.sim.Pods.Update(simPod)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("error updating status of pod %s", pod.Name))
 	}

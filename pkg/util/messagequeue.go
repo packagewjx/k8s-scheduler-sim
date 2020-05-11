@@ -1,6 +1,7 @@
 package util
 
 import (
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/watch"
 	"sync"
 )
@@ -82,9 +83,14 @@ func (queue *synchronizedMessageQueue) Publish(topic string, event *watch.Event)
 	queue.lock.RLock()
 	defer queue.lock.RUnlock()
 
+	logrus.Debugf("Publishing event %v", event)
+
 	for _, listener := range queue.listeners[topic] {
+		logrus.Tracef("Notifying subscriber %p", &listener)
 		listener <- *event
 	}
+
+	logrus.Debugf("Finished notifying all subscribers.")
 	return nil
 }
 
@@ -98,6 +104,7 @@ func (queue *synchronizedMessageQueue) newChannel(topic string) chan watch.Event
 
 	ch := make(chan watch.Event)
 	queue.listeners[topic] = append(queue.listeners[topic], ch)
+	logrus.Debugf("Creating new subscriber %p", &ch)
 	return ch
 }
 

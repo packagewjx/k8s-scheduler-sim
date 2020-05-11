@@ -1,6 +1,8 @@
-package simulate
+package core
 
 import (
+	"fmt"
+	v1 "k8s.io/api/core/v1"
 	"math"
 	"testing"
 )
@@ -8,25 +10,26 @@ import (
 type mockAlgorithm struct {
 }
 
+func (_ *mockAlgorithm) ResourceRequest() (cpu float64, mem int) {
+	return 1, 1
+}
+
 func (_ *mockAlgorithm) Tick(slot []float64, mem int) (Load float64, MemUsage int) {
 	return 1, 100
 }
 
-func (_ *mockAlgorithm) ResourceRequest() (cpu int, mem int) {
-	return 1, 100
-}
-
 func TestFairScheduler(t *testing.T) {
-	sched := NewFairScheduler()
+	sched, _ := GetCoreScheduler(FairScheduler)
 	readyPods := make([]*Pod, 10)
-	ma := &mockAlgorithm{}
-	builder := PodBuilder{
-		AlgorithmFactory: func(pod *Pod) PodAlgorithm {
-			return ma
-		},
-	}
 	for i := 0; i < len(readyPods); i++ {
-		readyPods[i] = builder.Build()
+		p, _ := BuildPod(fmt.Sprintf("pod-%d", i), 1, 1, BatchPodName, "null", "", v1.DefaultSchedulerName)
+		pod := &Pod{
+			Pod:       *p,
+			CpuLimit:  1,
+			MemLimit:  1,
+			Algorithm: &mockAlgorithm{},
+		}
+		readyPods[i] = pod
 	}
 
 	cases := []struct {

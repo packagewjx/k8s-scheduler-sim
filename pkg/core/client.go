@@ -1,9 +1,8 @@
-package pkg
+package core
 
 import (
 	"context"
 	"fmt"
-	"github.com/packagewjx/k8s-scheduler-sim/pkg/simulate"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/util"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -381,8 +380,8 @@ type coreV1NodeClient struct {
 
 func (client *coreV1NodeClient) Create(_ context.Context, node *apicorev1.Node, _ apimachineryv1.CreateOptions) (*apicorev1.Node, error) {
 	// 创建CoreScheduler
-	schedulerName := node.Annotations[simulate.NodeAnnotationCoreScheduler]
-	scheduler, exist := simulate.GetCoreScheduler(schedulerName)
+	schedulerName := node.Annotations[NodeAnnotationCoreScheduler]
+	scheduler, exist := GetCoreScheduler(schedulerName)
 	if !exist {
 		return nil, fmt.Errorf("No CoreScheduler %s", schedulerName)
 	}
@@ -393,11 +392,11 @@ func (client *coreV1NodeClient) Create(_ context.Context, node *apicorev1.Node, 
 	}
 
 	clone := node.DeepCopy()
-	simNode := &simulate.Node{
+	simNode := &Node{
 		Node:         *clone,
 		Scheduler:    scheduler,
-		Pods:         map[string]*simulate.Pod{},
-		CpuState:     make([][]*simulate.RunEntity, numCpu),
+		Pods:         map[string]*Pod{},
+		CpuState:     make([][]*RunEntity, numCpu),
 		LastCpuUsage: 0,
 	}
 
@@ -427,7 +426,7 @@ func (client *coreV1NodeClient) Update(_ context.Context, node *apicorev1.Node, 
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting oldNode %s", node.Name))
 	}
 
-	storeNode := item.(*simulate.Node)
+	storeNode := item.(*Node)
 	storeNode.Node = *(node.DeepCopy())
 
 	// 这里暂时没有更改simulate.Node的额外属性
@@ -458,7 +457,7 @@ func (client *coreV1NodeClient) UpdateStatus(_ context.Context, node *apicorev1.
 		return nil, err
 	}
 
-	storeNode := item.(*simulate.Node)
+	storeNode := item.(*Node)
 	storeNode.Status = *(node.Status.DeepCopy())
 
 	// 这里暂时没有更改simulate.Node的额外属性
@@ -497,7 +496,7 @@ func (client *coreV1NodeClient) Delete(_ context.Context, name string, _ apimach
 	// 发送删除通知
 	ev := &watch.Event{
 		Type:   watch.Deleted,
-		Object: &item.(*simulate.Node).Node,
+		Object: &item.(*Node).Node,
 	}
 	err = util.GetMessageQueue().Publish(TopicNode, ev)
 	if err != nil {
@@ -519,7 +518,7 @@ func (client *coreV1NodeClient) Get(_ context.Context, name string, _ apimachine
 	if err != nil {
 		return nil, err
 	}
-	node := item.(*simulate.Node)
+	node := item.(*Node)
 	return &node.Node, nil
 }
 
@@ -529,7 +528,7 @@ func (client *coreV1NodeClient) List(_ context.Context, _ apimachineryv1.ListOpt
 	nodes := make([]apicorev1.Node, 0, 10)
 	list := client.sim.Nodes.List()
 	for _, node := range list {
-		nodes = append(nodes, node.(*simulate.Node).Node)
+		nodes = append(nodes, node.(*Node).Node)
 	}
 
 	return &apicorev1.NodeList{
@@ -559,35 +558,35 @@ type coreV1PodClient struct {
 }
 
 func (c *coreV1PodClient) Create(_ context.Context, pod *apicorev1.Pod, _ apimachineryv1.CreateOptions) (*apicorev1.Pod, error) {
-	cpuLimit, err := strconv.ParseFloat(pod.Annotations[simulate.PodAnnotationCpuLimit], 64)
+	cpuLimit, err := strconv.ParseFloat(pod.Annotations[PodAnnotationCpuLimit], 64)
 	if err != nil {
 		return nil, errors.Wrap(err, "Error parsing cpulimit")
 	}
 
-	memLimit, err := strconv.ParseInt(pod.Annotations[simulate.PodAnnotationMemLimit], 10, 64)
+	memLimit, err := strconv.ParseInt(pod.Annotations[PodAnnotationMemLimit], 10, 64)
 	if err != nil {
 		return nil, errors.Wrap(err, "Error parsing memlimit")
 	}
 
-	algName, ok := pod.Annotations[simulate.PodAnnotationAlgorithm]
+	algName, ok := pod.Annotations[PodAnnotationAlgorithm]
 	if !ok {
 		return nil, fmt.Errorf("pod must have algorithm to run")
 	}
 
-	factory, exist := simulate.GetPodAlgorithmFactory(algName)
+	factory, exist := GetPodAlgorithmFactory(algName)
 	if !exist {
 		return nil, fmt.Errorf("no pod algorithm %s", algName)
 	}
 
-	stateString, _ := pod.Annotations[simulate.PodAnnotationInitialState]
+	stateString, _ := pod.Annotations[PodAnnotationInitialState]
 
-	_, ok = pod.Annotations[simulate.PodAnnotationDeploymentController]
+	_, ok = pod.Annotations[PodAnnotationDeploymentController]
 	if !ok {
 		return nil, fmt.Errorf("pod must have deployment controller name")
 	}
 
 	clone := pod.DeepCopy()
-	simPod := &simulate.Pod{
+	simPod := &Pod{
 		Pod:       *clone,
 		CpuLimit:  cpuLimit,
 		MemLimit:  memLimit,
@@ -626,7 +625,7 @@ func (c *coreV1PodClient) Update(_ context.Context, pod *apicorev1.Pod, _ apimac
 		return nil, errors.Wrap(err, fmt.Sprintf("error getting pod %s", pod.Name))
 	}
 
-	simPod := item.(*simulate.Pod)
+	simPod := item.(*Pod)
 	simPod.Pod = *(pod.DeepCopy())
 
 	err = c.sim.Pods.Update(simPod)
@@ -655,7 +654,7 @@ func (c *coreV1PodClient) UpdateStatus(_ context.Context, pod *apicorev1.Pod, _ 
 		return nil, errors.Wrap(err, fmt.Sprintf("error getting pod %s", pod.Name))
 	}
 
-	simPod := item.(*simulate.Pod)
+	simPod := item.(*Pod)
 	simPod.Pod.Status = *(pod.Status.DeepCopy())
 
 	err = c.sim.Pods.Update(simPod)
@@ -691,7 +690,7 @@ func (c *coreV1PodClient) Delete(_ context.Context, name string, _ apimachineryv
 
 	ev := &watch.Event{
 		Type:   watch.Deleted,
-		Object: &item.(*simulate.Pod).Pod,
+		Object: &item.(*Pod).Pod,
 	}
 	err = util.GetMessageQueue().Publish(TopicPod, ev)
 	if err != nil {
@@ -714,7 +713,7 @@ func (c *coreV1PodClient) Get(_ context.Context, name string, _ apimachineryv1.G
 		return nil, errors.Wrap(err, fmt.Sprintf("error getting pod %s", name))
 	}
 
-	return &item.(*simulate.Pod).Pod, nil
+	return &item.(*Pod).Pod, nil
 }
 
 func (c *coreV1PodClient) List(_ context.Context, _ apimachineryv1.ListOptions) (*apicorev1.PodList, error) {
@@ -723,7 +722,7 @@ func (c *coreV1PodClient) List(_ context.Context, _ apimachineryv1.ListOptions) 
 
 	arr := make([]apicorev1.Pod, 0, 10)
 	for _, pod := range list {
-		arr = append(arr, pod.(*simulate.Pod).Pod)
+		arr = append(arr, pod.(*Pod).Pod)
 	}
 
 	podList := &apicorev1.PodList{
@@ -761,7 +760,7 @@ func (c *coreV1PodClient) Bind(_ context.Context, binding *apicorev1.Binding, _ 
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("error getting node %v", err))
 	}
-	node := item.(*simulate.Node)
+	node := item.(*Node)
 
 	item, exists, err = c.sim.Pods.GetByKey(binding.Name)
 	if !exists {
@@ -770,7 +769,7 @@ func (c *coreV1PodClient) Bind(_ context.Context, binding *apicorev1.Binding, _ 
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("error getting pod %v", err))
 	}
-	pod := item.(*simulate.Pod)
+	pod := item.(*Pod)
 
 	err = node.BindPod(pod)
 	if err != nil {

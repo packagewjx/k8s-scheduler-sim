@@ -1,4 +1,4 @@
-package simulate
+package core
 
 // CoreScheduler 模拟操作系统内核的调度器，调度同一个节点上的所有可运行的Pod
 type CoreScheduler interface {

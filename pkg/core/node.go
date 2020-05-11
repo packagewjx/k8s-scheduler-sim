@@ -1,4 +1,4 @@
-package simulate
+package core
 
 import (
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/metrics"

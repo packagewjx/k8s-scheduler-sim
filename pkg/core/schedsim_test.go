@@ -1,8 +1,7 @@
-package pkg
+package core
 
 import (
 	"context"
-	"github.com/packagewjx/k8s-scheduler-sim/pkg/simulate"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -22,7 +21,7 @@ func TestScheduleOne(t *testing.T) {
 			Name:        "node-1",
 			ClusterName: "testcluster",
 			Annotations: map[string]string{
-				simulate.NodeAnnotationCoreScheduler: simulate.FairScheduler,
+				NodeAnnotationCoreScheduler: FairScheduler,
 			},
 		},
 		Spec: v1.NodeSpec{},
@@ -45,7 +44,7 @@ func TestScheduleOne(t *testing.T) {
 		t.Fatalf("node create fail: %v", err)
 	}
 
-	pod, _ := simulate.BuildPod("pod-1", 1, 100, simulate.BatchPodName, "null", &simulate.BatchPodState{
+	pod, _ := BuildPod("pod-1", 1, 100, BatchPodName, "null", &BatchPodState{
 		MemUsage:  100,
 		TotalTick: 100,
 	}, v1.DefaultSchedulerName)
@@ -90,7 +89,7 @@ func TestNodeClient(t *testing.T) {
 			ResourceVersion: "1",
 			ClusterName:     "TestCluster",
 			Annotations: map[string]string{
-				simulate.NodeAnnotationCoreScheduler: simulate.FairScheduler,
+				NodeAnnotationCoreScheduler: FairScheduler,
 			},
 		},
 		Spec: v1.NodeSpec{},
@@ -236,10 +235,10 @@ func TestPodClient(t *testing.T) {
 			Name:   podName,
 			Labels: map[string]string{},
 			Annotations: map[string]string{
-				simulate.PodAnnotationDeploymentController: "null",
-				simulate.PodAnnotationAlgorithm:            simulate.BatchPodName,
-				simulate.PodAnnotationMemLimit:             "1000",
-				simulate.PodAnnotationCpuLimit:             "1",
+				PodAnnotationDeploymentController: "null",
+				PodAnnotationAlgorithm:            BatchPodName,
+				PodAnnotationMemLimit:             "1000",
+				PodAnnotationCpuLimit:             "1",
 			},
 		},
 		Spec: v1.PodSpec{},

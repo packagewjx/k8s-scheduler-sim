@@ -1,11 +1,10 @@
-package pkg
+package core
 
 import (
 	"context"
 	"fmt"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/informers"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/mock"
-	"github.com/packagewjx/k8s-scheduler-sim/pkg/simulate"
 	v1 "k8s.io/api/core/v1"
 	k8sinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -29,7 +28,7 @@ type SchedSim struct {
 
 var (
 	PodKeyFunc cache.KeyFunc = func(obj interface{}) (string, error) {
-		if pod, ok := obj.(*simulate.Pod); ok {
+		if pod, ok := obj.(*Pod); ok {
 			return pod.Name, nil
 		} else if pod, ok := obj.(*v1.Pod); ok {
 			return pod.Name, nil
@@ -40,7 +39,7 @@ var (
 		}
 	}
 	NodeKeyFunc cache.KeyFunc = func(obj interface{}) (string, error) {
-		if node, ok := obj.(*simulate.Node); ok {
+		if node, ok := obj.(*Node); ok {
 			return node.Name, nil
 		} else if node, ok := obj.(*v1.Node); ok {
 			return node.Name, nil

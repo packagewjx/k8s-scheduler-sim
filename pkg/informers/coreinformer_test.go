@@ -20,9 +20,9 @@ func TestNodeInformer(t *testing.T) {
 
 	// 测试通知是否正常
 
+	ctx, cancel := context.WithCancel(context.Background())
 	nodeInformer := factory.Core().V1().Nodes().Informer()
-	stopCh := make(chan struct{})
-	go nodeInformer.Run(stopCh)
+	factory.Start(ctx.Done())
 	ch := make(chan *apicorev1.Node)
 	nodeInformer.AddEventHandler(&cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -39,6 +39,9 @@ func TestNodeInformer(t *testing.T) {
 			ch <- obj.(*apicorev1.Node)
 		},
 	})
+
+	// waiting to register listeners
+	<-time.After(100 * time.Millisecond)
 
 	nodeClient := fakeClient.CoreV1().Nodes()
 	oldGenerateName := "test-1"
@@ -83,5 +86,5 @@ func TestNodeInformer(t *testing.T) {
 		t.Error("删除通知失败")
 	}
 
-	stopCh <- struct{}{}
+	cancel()
 }

@@ -13,7 +13,49 @@ import (
 )
 
 func TestScheduleOne(t *testing.T) {
+	logrus.SetLevel(logrus.TraceLevel)
+	sim := NewSchedulerSimulator()
 
+	node := &v1.Node{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "node-1",
+			ClusterName: "testcluster",
+			Annotations: map[string]string{
+				simulate.NodeAnnotationCoreScheduler: simulate.FairScheduler,
+			},
+		},
+		Spec: v1.NodeSpec{},
+		Status: v1.NodeStatus{
+			Capacity: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("8"),
+				v1.ResourceMemory: resource.MustParse("16G"),
+				v1.ResourcePods:   resource.MustParse("100"),
+			},
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("8"),
+				v1.ResourceMemory: resource.MustParse("16G"),
+				v1.ResourcePods:   resource.MustParse("100"),
+			},
+			Phase: v1.NodeRunning,
+		},
+	}
+	node, err := sim.Client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("node create fail: %v", err)
+	}
+
+	pod, _ := simulate.BuildPod("pod-1", 1, 100, simulate.BatchPodName, "null", &simulate.BatchPodState{
+		MemUsage:  100,
+		TotalTick: 100,
+	}, v1.DefaultSchedulerName)
+
+	pod, err = sim.Client.CoreV1().Pods(DefaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("create pod failed: %v", err)
+	}
+
+	<-time.After(time.Hour)
 }
 
 func TestNodeClient(t *testing.T) {

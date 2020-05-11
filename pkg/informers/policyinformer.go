@@ -28,7 +28,7 @@ type podDisruptionBudgetInformer struct {
 }
 
 func (p *podDisruptionBudgetInformer) List(selector labels.Selector) (ret []*v1beta12.PodDisruptionBudget, err error) {
-	panic("implement me")
+	return []*v1beta12.PodDisruptionBudget{}, nil
 }
 
 func (p *podDisruptionBudgetInformer) PodDisruptionBudgets(namespace string) beta1.PodDisruptionBudgetNamespaceLister {

@@ -753,8 +753,9 @@ func (c *coreV1PodClient) UpdateEphemeralContainers(_ context.Context, _ string,
 	panic("Using this interface is not allowed.")
 }
 
-func (c *coreV1PodClient) Bind(_ context.Context, _ *apicorev1.Binding, _ apimachineryv1.CreateOptions) error {
-	panic("implement me")
+func (c *coreV1PodClient) Bind(_ context.Context, binding *apicorev1.Binding, _ apimachineryv1.CreateOptions) error {
+	fmt.Println(binding)
+	return nil
 }
 
 func (c *coreV1PodClient) Evict(_ context.Context, _ *v1beta1.Eviction) error {

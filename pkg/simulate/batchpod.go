@@ -13,15 +13,15 @@ type batchPodAlgorithm struct {
 	TotalTick float64
 }
 
-type batchPodState struct {
-	MemUsage  int
-	TotalTick float64
+type BatchPodState struct {
+	MemUsage  int     `json:"memUsage"`
+	TotalTick float64 `json:"totalTick"`
 }
 
 const BatchPodName = "BatchPod"
 
 var BatchPodFactory PodAlgorithmFactory = func(stateJson string, pod *Pod) (PodAlgorithm, error) {
-	state := &batchPodState{}
+	state := &BatchPodState{}
 	if stateJson != "" {
 		err := json.Unmarshal([]byte(stateJson), state)
 		if err != nil {

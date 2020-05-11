@@ -86,7 +86,7 @@ func (f *sharedInformerFactory) Admissionregistration() admissionregistration.In
 }
 
 func (f *sharedInformerFactory) Apps() apps.Interface {
-	panic("implement me")
+	return &appsInformer{}
 }
 
 func (f *sharedInformerFactory) Auditregistration() auditregistration.Interface {

@@ -1,8 +1,13 @@
 package simulate
 
 import (
+	"encoding/json"
+	"fmt"
+	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/uuid"
 )
 
 type Pod struct {
@@ -34,6 +39,37 @@ func (p *Pod) DeepCopyObject() runtime.Object {
 		MemLimit:  p.MemLimit,
 		Algorithm: p.Algorithm,
 	}
+}
+
+func BuildPod(name string, cpuLimit float64, memLimit int, algorithm string, deploymentController string, initState interface{}, schedulerName string) (*v1.Pod, error) {
+	stateBytes, err := json.Marshal(initState)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to marshal initState")
+	}
+
+	podStateJson := string(stateBytes)
+
+	return &v1.Pod{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			UID:  uuid.NewUUID(),
+			Annotations: map[string]string{
+				PodAnnotationCpuLimit:             fmt.Sprintf("%.3f", cpuLimit),
+				PodAnnotationMemLimit:             fmt.Sprintf("%d", memLimit),
+				PodAnnotationAlgorithm:            algorithm,
+				PodAnnotationDeploymentController: deploymentController,
+				PodAnnotationInitialState:         podStateJson,
+			},
+		},
+		// inorder to go to unscheduled queue
+		Spec: v1.PodSpec{
+			SchedulerName: schedulerName,
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodPending,
+		},
+	}, nil
 }
 
 type PodAlgorithm interface {

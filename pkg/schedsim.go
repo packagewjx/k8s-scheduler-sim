@@ -76,6 +76,7 @@ func NewSchedulerSimulator() *SchedSim {
 		panic(err)
 	}
 	sim.Scheduler = sched
+	go sim.Scheduler.Run(rootCtx)
 
 	return sim
 }

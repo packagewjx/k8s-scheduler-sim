@@ -60,7 +60,7 @@ func (c *coreInformer) PodTemplates() corev1.PodTemplateInformer {
 }
 
 func (c *coreInformer) ReplicationControllers() corev1.ReplicationControllerInformer {
-	panic("implement me")
+	return &replicationControllerInformer{}
 }
 
 func (c *coreInformer) ResourceQuotas() corev1.ResourceQuotaInformer {
@@ -127,12 +127,16 @@ func (p *persistentVolumeInformer) Lister() listerv1.PersistentVolumeLister {
 type serviceInformer struct {
 }
 
-func (s *serviceInformer) List(selector labels.Selector) (ret []*v1.Service, err error) {
+func (s *serviceInformer) Get(name string) (*v1.Service, error) {
 	panic("implement me")
 }
 
+func (s *serviceInformer) List(selector labels.Selector) (ret []*v1.Service, err error) {
+	return []*v1.Service{}, nil
+}
+
 func (s *serviceInformer) Services(namespace string) listerv1.ServiceNamespaceLister {
-	panic("implement me")
+	return s
 }
 
 func (s *serviceInformer) Informer() cache.SharedIndexInformer {
@@ -141,4 +145,27 @@ func (s *serviceInformer) Informer() cache.SharedIndexInformer {
 
 func (s *serviceInformer) Lister() listerv1.ServiceLister {
 	return s
+}
+
+type replicationControllerInformer struct {
+}
+
+func (r *replicationControllerInformer) List(selector labels.Selector) (ret []*v1.ReplicationController, err error) {
+	return []*v1.ReplicationController{}, nil
+}
+
+func (r *replicationControllerInformer) ReplicationControllers(namespace string) listerv1.ReplicationControllerNamespaceLister {
+	panic("implement me")
+}
+
+func (r *replicationControllerInformer) GetPodControllers(pod *v1.Pod) ([]*v1.ReplicationController, error) {
+	return []*v1.ReplicationController{}, nil
+}
+
+func (r *replicationControllerInformer) Informer() cache.SharedIndexInformer {
+	return &fakeInformer{}
+}
+
+func (r *replicationControllerInformer) Lister() listerv1.ReplicationControllerLister {
+	return r
 }

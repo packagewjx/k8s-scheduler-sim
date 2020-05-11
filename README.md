@@ -17,7 +17,7 @@
 ### 监控数据采集
 
 用于衡量调度器的性能。
-
+ 
 ## 调度器扩展
 
 采用`Kubernetes-v1.18.0`版本的调度器框架，根据该框架的设计扩展调度器。
@@ -75,18 +75,22 @@
   - [x] DeploymentController设计。用于在每个时钟周期向集群提交数据
   - [ ] 使用阿里巴巴2017年数据，实现符合该数据集的DeploymentController
 - [ ] 模拟器设计
-  - [ ] Pod模拟器设计
+  - [x] Pod模拟器设计
     - [x] 初步可运行框架设计
     - [x] 整合Kubernetes API的Pod
-    - [ ] `client-go` API可访问
-  - [ ] Node模拟器设计
+  - [x] Node模拟器设计
     - [x] 模拟节点运行逻辑设计
     - [x] 整合Kubernetes API的Node
-    - [x] `client-go` API可访问
-  - [ ] 事件通知器接口`SharedInformerFactory`与`PodInformer`实现
+  - [x] 事件通知器接口`SharedInformerFactory`与`PodInformer`实现
   - [ ] client-go接口实现
+    - [x] Pod增删改查与Watch
+    - [x] Node增删改查与Watch
+    - [ ] 根据模拟需求待定
+  - [ ] 调度Pod
+    - [ ] 将新的Pod放入调度队列
+    - [ ] 将Pod与Node绑定
 - [ ] 监控系统的设计
-  - [ ] 监控数据设计
+  - [x] 监控数据设计
   - [x] 节点监控数据采集
   - [ ] 监控数据统计
   

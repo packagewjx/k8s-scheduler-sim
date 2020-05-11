@@ -754,12 +754,36 @@ func (c *coreV1PodClient) UpdateEphemeralContainers(_ context.Context, _ string,
 }
 
 func (c *coreV1PodClient) Bind(_ context.Context, binding *apicorev1.Binding, _ apimachineryv1.CreateOptions) error {
-	fmt.Println(binding)
+	item, exists, err := c.sim.Nodes.GetByKey(binding.Target.Name)
+	if !exists {
+		return fmt.Errorf("no node %s", binding.Target.Name)
+	}
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("error getting node %v", err))
+	}
+	node := item.(*simulate.Node)
+
+	item, exists, err = c.sim.Pods.GetByKey(binding.Name)
+	if !exists {
+		return fmt.Errorf("no pod %s", binding.Target.Name)
+	}
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("error getting pod %v", err))
+	}
+	pod := item.(*simulate.Pod)
+
+	err = node.BindPod(pod)
+	if err != nil {
+		return errors.Wrap(err, "bind error")
+	}
+
 	return nil
 }
 
-func (c *coreV1PodClient) Evict(_ context.Context, _ *v1beta1.Eviction) error {
-	panic("implement me")
+func (c *coreV1PodClient) Evict(_ context.Context, eviction *v1beta1.Eviction) error {
+	// TODO
+	logrus.Debug(eviction)
+	return nil
 }
 
 func (c *coreV1PodClient) GetLogs(_ string, _ *apicorev1.PodLogOptions) *rest.Request {

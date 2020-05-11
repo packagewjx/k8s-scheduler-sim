@@ -83,12 +83,13 @@
     - [x] 整合Kubernetes API的Node
   - [x] 事件通知器接口`SharedInformerFactory`与`PodInformer`实现
   - [ ] client-go接口实现
-    - [x] Pod增删改查与Watch
+    - [x] Pod增删改查与Watch，以及Bind接口
     - [x] Node增删改查与Watch
     - [ ] 根据模拟需求待定
-  - [ ] 调度Pod
-    - [ ] 将新的Pod放入调度队列
-    - [ ] 将Pod与Node绑定
+  - [x] 调度Pod
+    - [x] 将新的Pod放入调度队列
+    - [x] 将Pod与Node绑定
+  - [ ] 调度器插件编写
 - [ ] 监控系统的设计
   - [x] 监控数据设计
   - [x] 节点监控数据采集
@@ -103,3 +104,8 @@ Kubernetes调度器拥有许多的Predicates和Priority插件，能够查看集�
   - StorageClass
   - PersistentVolume
   - PersistentVolumeClaim
+- 部署相关
+  - Deployment
+  - ReplicaSet
+  - Services
+  - ReplicationController

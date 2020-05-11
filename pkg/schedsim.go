@@ -28,7 +28,7 @@ type SchedSim struct {
 }
 
 var (
-	podKeyFunc cache.KeyFunc = func(obj interface{}) (string, error) {
+	PodKeyFunc cache.KeyFunc = func(obj interface{}) (string, error) {
 		if pod, ok := obj.(*simulate.Pod); ok {
 			return pod.Name, nil
 		} else if pod, ok := obj.(*v1.Pod); ok {
@@ -39,7 +39,7 @@ var (
 			return "", fmt.Errorf("error getting key from %v", obj)
 		}
 	}
-	nodeKeyFunc cache.KeyFunc = func(obj interface{}) (string, error) {
+	NodeKeyFunc cache.KeyFunc = func(obj interface{}) (string, error) {
 		if node, ok := obj.(*simulate.Node); ok {
 			return node.Name, nil
 		} else if node, ok := obj.(*v1.Node); ok {
@@ -54,10 +54,10 @@ func NewSchedulerSimulator() *SchedSim {
 	rootCtx, cancel := context.WithCancel(context.Background())
 	sim := &SchedSim{
 		Client:                nil,
-		Nodes:                 cache.NewStore(nodeKeyFunc),
+		Nodes:                 cache.NewStore(NodeKeyFunc),
 		DeploymentControllers: nil,
 		PriorityClasses:       nil,
-		Pods:                  cache.NewStore(podKeyFunc),
+		Pods:                  cache.NewStore(PodKeyFunc),
 		Scheduler:             nil,
 		cancelFunc:            cancel,
 	}

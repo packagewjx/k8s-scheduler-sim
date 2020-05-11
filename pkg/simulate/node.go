@@ -2,6 +2,7 @@ package simulate
 
 import (
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/metrics"
+	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -20,6 +21,20 @@ type Node struct {
 
 	// 上一轮的CPU使用百分比，用于查看是否有资源竞争，模拟高资源竞争时CPU处理能力的下降
 	LastCpuUsage float64
+}
+
+// TODO 可能会有一些绑定失败的条件，如内存不够用等
+func (n *Node) BindPod(pod *Pod) error {
+	logrus.Infof("Binding Pod %s to Node %s", n.Name, pod.Name)
+
+	// 暂时使用pod.Name作为键
+	n.Pods[pod.Name] = pod
+	return nil
+}
+
+func (n *Node) EvictPod(pod *Pod) error {
+	delete(n.Pods, pod.Name)
+	return nil
 }
 
 // 根据节点拥有的Pod，更新当前的节点状态，包括资源使用率，Pod状态等
@@ -53,12 +68,7 @@ func (n *Node) Tick() *metrics.TickMetrics {
 	}
 
 	for i := 0; i < len(terminatedPods); i++ {
-		//通过watch.Interface通知，而不用这个
-		// 通知控制器停止了的Pod
-		//terminatedPods[i].Controller.InformPodEvent(&PodEvent{
-		//	Who:  terminatedPods[i],
-		//	What: PodTerminateEvent,
-		//})
+		// TODO 通过watch.Interface通知Pods结束
 		// 从本节点移除
 		delete(n.Pods, terminatedPods[i].Name)
 	}

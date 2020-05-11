@@ -55,7 +55,7 @@ func TestScheduleOne(t *testing.T) {
 		t.Fatalf("create pod failed: %v", err)
 	}
 
-	<-time.After(time.Hour)
+	<-time.After(2 * time.Second)
 }
 
 func TestNodeClient(t *testing.T) {

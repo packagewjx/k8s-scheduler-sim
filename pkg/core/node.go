@@ -5,6 +5,7 @@ import (
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/metrics"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -24,6 +25,31 @@ type Node struct {
 
 	// 上一轮的CPU使用百分比，用于查看是否有资源竞争，模拟高资源竞争时CPU处理能力的下降
 	LastCpuUsage float64
+}
+
+func BuildNode(name string, cpu, mem, numPods, coreScheduler string) *v1.Node {
+	return &v1.Node{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Annotations: map[string]string{
+				NodeAnnotationCoreScheduler: coreScheduler,
+			},
+		},
+		Spec: v1.NodeSpec{},
+		Status: v1.NodeStatus{
+			Capacity: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse(cpu),
+				v1.ResourceMemory: resource.MustParse(mem),
+				v1.ResourcePods:   resource.MustParse(numPods),
+			},
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse(cpu),
+				v1.ResourceMemory: resource.MustParse(mem),
+				v1.ResourcePods:   resource.MustParse(numPods),
+			},
+		},
+	}
 }
 
 // TODO 可能会有一些绑定失败的条件，如内存不够用等
@@ -66,6 +92,12 @@ func (n *Node) Tick(client kubernetes.Interface) *metrics.TickMetrics {
 				slot: make([]float64, 0),
 				mem:  mem,
 			})
+		} else if pod.Status.Phase == v1.PodPending {
+			pod.Status.Phase = v1.PodRunning
+			_, err := client.CoreV1().Pods(DefaultNamespace).UpdateStatus(context.TODO(), &pod.Pod, metav1.UpdateOptions{})
+			if err != nil {
+				logrus.Errorf("Error Updating Pod %s Status", pod.Name)
+			}
 		} else {
 			terminatedPods = append(terminatedPods, pod)
 		}

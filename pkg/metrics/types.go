@@ -9,14 +9,17 @@ type TickMetrics struct {
 }
 
 type PeriodMetrics struct {
+	CpuUsageLastTick           float64
 	CpuUsageAverage            float64
 	CpuUsageAverageIn60Ticks   float64
 	CpuUsageAverageIn300Ticks  float64
 	CpuUsageAverageIn1500Ticks float64
+	MemUsageLastTick           float64
 	MemUsageAverage            float64
 	MemUsageAverageIn60Ticks   float64
 	MemUsageAverageIn300Ticks  float64
 	MemUsageAverageIn1500Ticks float64
+	LoadLastTick               float64
 	LoadAverage                float64
 	LoadAverageIn60Ticks       float64
 	LoadAverageIn300Ticks      float64

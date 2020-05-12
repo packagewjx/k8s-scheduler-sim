@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/informers"
+	"github.com/packagewjx/k8s-scheduler-sim/pkg/metrics"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/mock"
+	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	k8sinformers "k8s.io/client-go/informers"
@@ -25,6 +27,17 @@ type SchedSim struct {
 	Scheduler             *scheduler.Scheduler
 	InformerFactory       k8sinformers.SharedInformerFactory
 	cancelFunc            context.CancelFunc
+
+	// 当前的时钟周期数
+	Tick int
+	// 总运行时钟周期数
+	TotalTick int
+
+	// BeforeUpdate 在更新Pod状态与Node状态之前调用的控制器函数
+	BeforeUpdate []Controller
+
+	// AfterUpdate 在更新Pod状态之后调用的控制器函数，通常用于监控统计等
+	AfterUpdate []Controller
 }
 
 var (
@@ -57,7 +70,7 @@ var (
 	}
 )
 
-func NewSchedulerSimulator() *SchedSim {
+func NewSchedulerSimulator(totalTick int) *SchedSim {
 	rootCtx, cancel := context.WithCancel(context.Background())
 	sim := &SchedSim{
 		Client:                nil,
@@ -66,6 +79,7 @@ func NewSchedulerSimulator() *SchedSim {
 		PriorityClasses:       nil,
 		Pods:                  cache.NewStore(PodKeyFunc),
 		Scheduler:             nil,
+		TotalTick:             totalTick,
 		cancelFunc:            cancel,
 	}
 
@@ -98,4 +112,100 @@ func buildScheduler(ctx context.Context, factory k8sinformers.SharedInformerFact
 
 func (sim *SchedSim) Run() {
 	defer sim.cancelFunc()
+
+	nodeMetrics := make(map[*Node]metrics.Aggregator)
+
+	for tick := 0; tick < sim.TotalTick; tick++ {
+		logrus.Infof("Tick %d", tick)
+		logrus.Debug("Running BeforeUpdate Controllers")
+		for _, controller := range sim.BeforeUpdate {
+			controller.Tick(sim)
+		}
+
+		logrus.Debug("Updating Node status")
+		nodes := sim.Nodes.List()
+		currentMetrics := make([]*metrics.PeriodMetrics, 0, len(nodes))
+		for _, item := range nodes {
+			node := item.(*Node)
+			logrus.Debugf("Updating Node %s", node.Name)
+			met := node.Tick(sim.Client)
+			aggregator, ok := nodeMetrics[node]
+			if !ok {
+				aggregator = metrics.NewAggregator()
+				nodeMetrics[node] = aggregator
+			}
+			periodMetrics := aggregator.Aggregate(met)
+			currentMetrics = append(currentMetrics, periodMetrics)
+		}
+
+		// 显示各个节点的状态
+		// 打印表头
+		fmt.Println("Node\tCPU  \tCPUALL\tCPU60\tCPU300\tCPU1500\tMem  \tMemALL\tMem60\tMem300\tMem1500\tLoad \tLoadALL\tLoad60\tLoad300\tLoad1500")
+		for i, metric := range currentMetrics {
+			fmt.Printf("%s\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\n", nodes[i].(*Node).Name,
+				metric.CpuUsageLastTick, metric.CpuUsageAverage, metric.CpuUsageAverageIn60Ticks, metric.CpuUsageAverageIn300Ticks, metric.CpuUsageAverageIn1500Ticks,
+				metric.MemUsageLastTick, metric.MemUsageAverage, metric.MemUsageAverageIn60Ticks, metric.MemUsageAverageIn300Ticks, metric.MemUsageAverageIn1500Ticks,
+				metric.LoadLastTick, metric.LoadAverage, metric.LoadAverageIn60Ticks, metric.LoadAverageIn300Ticks, metric.LoadAverageIn1500Ticks)
+		}
+
+		logrus.Debug("Running AfterUpdate Controllers")
+		// 运行后更新控制器
+		for _, controller := range sim.AfterUpdate {
+			controller.Tick(sim)
+		}
+	}
+
+}
+
+type controllerTiming int
+
+var (
+	beforeUpdate = controllerTiming(1)
+	afterUpdate  = controllerTiming(2)
+)
+
+func (sim *SchedSim) RegisterBeforeUpdateController(controller Controller) {
+	sim.registerController(controller, beforeUpdate)
+}
+
+func (sim *SchedSim) RegisterAfterUpdateController(controller Controller) {
+	sim.registerController(controller, afterUpdate)
+}
+
+func (sim *SchedSim) DeleteBeforeController(controller Controller) {
+	sim.deleteController(controller, beforeUpdate)
+}
+
+func (sim *SchedSim) DeleteAfterController(controller Controller) {
+	sim.deleteController(controller, afterUpdate)
+}
+
+func (sim *SchedSim) registerController(controller Controller, timing controllerTiming) {
+	switch timing {
+	case beforeUpdate:
+		sim.BeforeUpdate = append(sim.BeforeUpdate, controller)
+	case afterUpdate:
+		sim.AfterUpdate = append(sim.AfterUpdate, controller)
+	}
+}
+
+func (sim *SchedSim) deleteController(controller Controller, timing controllerTiming) {
+	var arr *[]Controller
+	switch timing {
+	case beforeUpdate:
+		arr = &sim.BeforeUpdate
+	case afterUpdate:
+		arr = &sim.AfterUpdate
+	default:
+		panic("Invalid argument")
+	}
+
+	idx := 0
+	for ; idx < len(*arr) && (*arr)[idx] != controller; idx++ {
+	}
+
+	if idx < len(*arr) {
+		(*arr)[idx] = (*arr)[len(*arr)-1]
+		*arr = (*arr)[:len(*arr)-1]
+	}
 }

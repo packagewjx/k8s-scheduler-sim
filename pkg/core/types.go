@@ -2,7 +2,8 @@ package core
 
 // Controller 广义控制器，管理资源或者模拟负载情况等。Controller应当通过kubernetes.Interface访问集群资源
 type Controller interface {
-	Tick()
+	// Tick 更新控制器状态的函数。本函数应该是同步的
+	Tick(sim *SchedSim)
 }
 
 // DeploymentController 模拟Kubernetes的控制器，根据其配置的模板构建Pod，然后通过Tick方法提交到本集群

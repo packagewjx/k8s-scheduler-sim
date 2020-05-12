@@ -1,7 +1,11 @@
 package metrics
 
 type Aggregator interface {
+	// Aggregate 将新的统计数据纳入到总统计
 	Aggregate(tickMetrics *TickMetrics) *PeriodMetrics
+
+	// Get 获取最新的统计数据
+	Get() *PeriodMetrics
 }
 
 func NewAggregator() Aggregator {
@@ -23,19 +27,24 @@ func NewAggregator() Aggregator {
 }
 
 type aggregator struct {
-	count    int
-	cpuSum   float64
-	cpu60    *ringQueue
-	cpu300   *ringQueue
-	cpu1500  *ringQueue
-	memSum   float64
-	mem60    *ringQueue
-	mem300   *ringQueue
-	mem1500  *ringQueue
-	loadSum  float64
-	load60   *ringQueue
-	load300  *ringQueue
-	load1500 *ringQueue
+	count        int
+	cpuSum       float64
+	cpu60        *ringQueue
+	cpu300       *ringQueue
+	cpu1500      *ringQueue
+	memSum       float64
+	mem60        *ringQueue
+	mem300       *ringQueue
+	mem1500      *ringQueue
+	loadSum      float64
+	load60       *ringQueue
+	load300      *ringQueue
+	load1500     *ringQueue
+	latestMetric *PeriodMetrics
+}
+
+func (a *aggregator) Get() *PeriodMetrics {
+	return a.latestMetric
 }
 
 func (a *aggregator) Aggregate(tickMetrics *TickMetrics) *PeriodMetrics {
@@ -44,20 +53,24 @@ func (a *aggregator) Aggregate(tickMetrics *TickMetrics) *PeriodMetrics {
 	a.memSum += tickMetrics.MemUsage
 	a.loadSum += tickMetrics.Load
 
-	return &PeriodMetrics{
+	a.latestMetric = &PeriodMetrics{
+		CpuUsageLastTick:           tickMetrics.CpuUsage,
 		CpuUsageAverage:            a.cpuSum / float64(a.count),
 		CpuUsageAverageIn60Ticks:   a.cpu60.add(tickMetrics.CpuUsage),
 		CpuUsageAverageIn300Ticks:  a.cpu300.add(tickMetrics.CpuUsage),
 		CpuUsageAverageIn1500Ticks: a.cpu1500.add(tickMetrics.CpuUsage),
+		MemUsageLastTick:           tickMetrics.MemUsage,
 		MemUsageAverage:            a.memSum / float64(a.count),
 		MemUsageAverageIn60Ticks:   a.mem60.add(tickMetrics.MemUsage),
 		MemUsageAverageIn300Ticks:  a.mem300.add(tickMetrics.MemUsage),
 		MemUsageAverageIn1500Ticks: a.mem1500.add(tickMetrics.MemUsage),
+		LoadLastTick:               tickMetrics.Load,
 		LoadAverage:                a.loadSum / float64(a.count),
 		LoadAverageIn60Ticks:       a.load60.add(tickMetrics.Load),
 		LoadAverageIn300Ticks:      a.load300.add(tickMetrics.Load),
 		LoadAverageIn1500Ticks:     a.load1500.add(tickMetrics.Load),
 	}
+	return a.latestMetric
 }
 
 func newRingQueue(capacity int) *ringQueue {

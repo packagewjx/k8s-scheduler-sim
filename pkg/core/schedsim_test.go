@@ -13,7 +13,7 @@ import (
 
 func TestScheduleOne(t *testing.T) {
 	logrus.SetLevel(logrus.TraceLevel)
-	sim := NewSchedulerSimulator()
+	sim := NewSchedulerSimulator(1000)
 
 	node := &v1.Node{
 		TypeMeta: metav1.TypeMeta{},
@@ -59,7 +59,7 @@ func TestScheduleOne(t *testing.T) {
 
 func TestNodeClient(t *testing.T) {
 	logrus.SetLevel(logrus.DebugLevel)
-	sim := NewSchedulerSimulator()
+	sim := NewSchedulerSimulator(1000)
 
 	nodeClient := sim.Client.CoreV1().Nodes()
 
@@ -209,7 +209,7 @@ func TestNodeClient(t *testing.T) {
 }
 
 func TestPodClient(t *testing.T) {
-	sim := NewSchedulerSimulator()
+	sim := NewSchedulerSimulator(1000)
 	podClient := sim.Client.CoreV1().Pods(DefaultNamespace)
 	podInformer := sim.InformerFactory.Core().V1().Pods().Informer()
 	ch := make(chan bool)
@@ -334,5 +334,39 @@ func TestPodClient(t *testing.T) {
 	case <-ch:
 	case <-time.After(10 * time.Millisecond):
 		t.Errorf("no delete event")
+	}
+}
+
+func TestSchedSimRun(t *testing.T) {
+	simulator := NewSchedulerSimulator(1000)
+	node := BuildNode("node-1", "10", "2G", "1000", FairScheduler)
+	_, err := simulator.Client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+	if err != nil {
+		panic(err)
+	}
+	simulator.RegisterBeforeUpdateController(&mockDeployment{})
+
+	simulator.Run()
+}
+
+type mockDeployment struct {
+	phase int
+}
+
+func (m *mockDeployment) Tick(sim *SchedSim) {
+	if m.phase == 0 {
+		state := &BatchPodState{
+			MemUsage:  1,
+			TotalTick: 100,
+		}
+		pod, _ := BuildPod("pod-1", 1, 1, BatchPodName, "null", state, v1.DefaultSchedulerName)
+		_, err := sim.Client.CoreV1().Pods(DefaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+		if err != nil {
+			panic(err)
+		}
+
+		m.phase++
+	} else if m.phase == 1 {
+		sim.DeleteBeforeController(m)
 	}
 }

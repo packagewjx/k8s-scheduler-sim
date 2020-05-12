@@ -78,22 +78,31 @@
   - [x] Pod模拟器设计
     - [x] 初步可运行框架设计
     - [x] 整合Kubernetes API的Pod
+    - [x] 批处理Pod算法实现
+    - [ ] 在线服务Pod算法实现
   - [x] Node模拟器设计
     - [x] 模拟节点运行逻辑设计
     - [x] 整合Kubernetes API的Node
-  - [x] 事件通知器接口`SharedInformerFactory`与`PodInformer`实现
+  - [ ] DeploymentController设计
+  - [ ] 待定：Service设计
+    - [ ] Service逻辑设计，如控制Pod的负载
+    - [ ] Service响应时间监控
   - [ ] client-go接口实现
     - [x] Pod增删改查与Watch，以及Bind接口
     - [x] Node增删改查与Watch
-    - [ ] 根据模拟需求待定
+    - [x] 事件通知器接口`SharedInformerFactory`与`PodInformer`实现
+    - [ ] 根据模拟需求与调度器的Predicate和Priority支持需求待定
   - [x] 调度Pod
     - [x] 将新的Pod放入调度队列
     - [x] 将Pod与Node绑定
   - [ ] 调度器插件编写
+    - [ ] 调度成功的通知PostBind插件
 - [ ] 监控系统的设计
   - [x] 监控数据设计
   - [x] 节点监控数据采集
   - [ ] 监控数据统计
+    - [x] 监控数据统计工具实现
+    - [ ] 收集与统计集群节点监控
   
 ## 尚未计划实现的调度器功能
 

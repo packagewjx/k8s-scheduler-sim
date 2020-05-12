@@ -66,7 +66,9 @@ func (queue *synchronizedMessageQueue) NewTopic(topic string) error {
 	queue.lock.Lock()
 	defer queue.lock.Unlock()
 
-	queue.listeners[topic] = make([]chan watch.Event, 0, 10)
+	if _, ok := queue.listeners[topic]; !ok {
+		queue.listeners[topic] = make([]chan watch.Event, 0, 10)
+	}
 	return nil
 }
 

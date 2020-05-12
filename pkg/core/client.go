@@ -8,11 +8,14 @@ import (
 	"github.com/sirupsen/logrus"
 	apicorev1 "k8s.io/api/core/v1"
 	"k8s.io/api/policy/v1beta1"
+	apischedulingv1 "k8s.io/api/scheduling/v1"
 	apimachineryv1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	deprecatedv1 "k8s.io/client-go/deprecated/typed/core/v1"
+	"k8s.io/client-go/deprecated/typed/scheduling/v1"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/kubernetes"
 	admissionregistrationv1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
 	admissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
@@ -58,9 +61,23 @@ import (
 )
 
 var (
-	TopicNode = "node"
-	TopicPod  = "pod"
+	TopicNode          = "node"
+	TopicPod           = "pod"
+	TopicPriorityClass = "priorityclass"
 )
+
+func NewClient(sim *SchedSim) (kubernetes.Interface, error) {
+	// New Topics here
+	topics := []string{TopicNode, TopicPod, TopicPriorityClass}
+
+	for _, topic := range topics {
+		err := util.GetMessageQueue().NewTopic(topic)
+		if err != nil {
+			return nil, errors.Wrap(err, "error creating topic node")
+		}
+	}
+	return &simClient{sim: sim}, nil
+}
 
 // For Kubernetes scheduler use only. ONLY implements those used by scheduler.
 // All options are ignored, for simplicity.
@@ -787,4 +804,87 @@ func (c *coreV1PodClient) Evict(_ context.Context, eviction *v1beta1.Eviction) e
 
 func (c *coreV1PodClient) GetLogs(_ string, _ *apicorev1.PodLogOptions) *rest.Request {
 	panic("Using this interface is not allowed.")
+}
+
+type schedulingV1Client struct {
+	sim *SchedSim
+}
+
+func (s *schedulingV1Client) Create(class *apischedulingv1.PriorityClass) (*apischedulingv1.PriorityClass, error) {
+	err := s.sim.PriorityClasses.Add(class)
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("error stroing PriorityClass %s", class.Name))
+	}
+	return class, nil
+}
+
+func (s *schedulingV1Client) Update(class *apischedulingv1.PriorityClass) (*apischedulingv1.PriorityClass, error) {
+	err := s.sim.PriorityClasses.Update(class)
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("error updating PriorityClass %s", class.Name))
+	}
+	return class, nil
+}
+
+func (s *schedulingV1Client) Delete(name string, options *apimachineryv1.DeleteOptions) error {
+	item, exists, err := s.sim.PriorityClasses.GetByKey(name)
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("error getting PriorityClass %s", name))
+	}
+	if !exists {
+		return fmt.Errorf("no PriorityClass %s", name)
+	}
+	class := item.(*apischedulingv1.PriorityClass)
+
+	err = s.sim.PriorityClasses.Delete(class)
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("error deleting PriorityClass %s", name))
+	}
+	return nil
+}
+
+func (s *schedulingV1Client) DeleteCollection(options *apimachineryv1.DeleteOptions, listOptions apimachineryv1.ListOptions) error {
+	panic("Using this interface is not allowed.")
+}
+
+func (s *schedulingV1Client) Get(name string, options apimachineryv1.GetOptions) (*apischedulingv1.PriorityClass, error) {
+	key, exists, err := s.sim.PriorityClasses.GetByKey(name)
+	if !exists {
+		return nil, fmt.Errorf("No PriorityClass %s", name)
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("error getting PriorityClass %s", name))
+	}
+	return key.(*apischedulingv1.PriorityClass), nil
+}
+
+func (s *schedulingV1Client) List(opts apimachineryv1.ListOptions) (*apischedulingv1.PriorityClassList, error) {
+	list := s.sim.PriorityClasses.List()
+	classList := &apischedulingv1.PriorityClassList{}
+	items := make([]apischedulingv1.PriorityClass, 0, len(list))
+	for _, item := range list {
+		items = append(items, item.(apischedulingv1.PriorityClass))
+	}
+	classList.Items = items
+	return classList, nil
+}
+
+func (s *schedulingV1Client) Watch(opts apimachineryv1.ListOptions) (watch.Interface, error) {
+	watcher, err := util.GetMessageQueue().Subscribe(TopicPriorityClass)
+	if err != nil {
+		return nil, errors.Wrap(err, "error subscribing PriorityClass Topic")
+	}
+	return watcher, nil
+}
+
+func (s *schedulingV1Client) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *apischedulingv1.PriorityClass, err error) {
+	panic("implement me")
+}
+
+func (s *schedulingV1Client) RESTClient() rest.Interface {
+	panic("implement me")
+}
+
+func (s *schedulingV1Client) PriorityClasses() v1.PriorityClassInterface {
+	return s
 }

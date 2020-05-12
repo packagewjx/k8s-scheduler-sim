@@ -6,6 +6,7 @@ import (
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/informers"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/mock"
 	v1 "k8s.io/api/core/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	k8sinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -47,6 +48,13 @@ var (
 			return "", fmt.Errorf("error getting key from %v", obj)
 		}
 	}
+	PriorityClassKeyFucn cache.KeyFunc = func(obj interface{}) (string, error) {
+		if cls, ok := obj.(*schedulingv1.PriorityClass); ok {
+			return cls.Name, nil
+		} else {
+			return "", fmt.Errorf("invalid type, not PriorityClass")
+		}
+	}
 )
 
 func NewSchedulerSimulator() *SchedSim {
@@ -61,7 +69,10 @@ func NewSchedulerSimulator() *SchedSim {
 		cancelFunc:            cancel,
 	}
 
-	client := &simClient{sim: sim}
+	client, err := NewClient(sim)
+	if err != nil {
+		panic(fmt.Sprintf("error create client: %s", err))
+	}
 	sim.Client = client
 	sim.InformerFactory = informers.NewSharedInformerFactory(client)
 	// explicitly trigger the creation of these informers, and then start the factory to let the informer subscribe

@@ -1,9 +1,12 @@
 package core
 
 import (
+	"context"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/metrics"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -28,7 +31,8 @@ func (n *Node) BindPod(pod *Pod) error {
 	logrus.Infof("Binding Pod %s to Node %s", n.Name, pod.Name)
 
 	// 暂时使用pod.Name作为键
-	n.Pods[pod.Name] = pod
+	key, _ := PodKeyFunc(pod)
+	n.Pods[key] = pod
 	return nil
 }
 
@@ -39,7 +43,7 @@ func (n *Node) EvictPod(pod *Pod) error {
 
 // 根据节点拥有的Pod，更新当前的节点状态，包括资源使用率，Pod状态等
 // TODO 内存分配
-func (n *Node) Tick() *metrics.TickMetrics {
+func (n *Node) Tick(client kubernetes.Interface) *metrics.TickMetrics {
 	terminatedPods := make([]*Pod, 0)
 	type PodResource struct {
 		slot     []float64
@@ -67,13 +71,22 @@ func (n *Node) Tick() *metrics.TickMetrics {
 		}
 	}
 
-	for i := 0; i < len(terminatedPods); i++ {
+	logrus.Debugf("Node %s Terminating Pods", n.Name)
+	for _, pod := range terminatedPods {
+		logrus.Infof("Pod %s is now %s", pod.Name, pod.Status.Phase)
 		// TODO 通过watch.Interface通知Pods结束
+		_, err := client.CoreV1().Pods(DefaultNamespace).UpdateStatus(context.TODO(), &pod.Pod, metav1.UpdateOptions{})
+		if err != nil {
+			logrus.Errorf("Node %s Update pod status for pod %s error: %v", n.Name, pod.Name, err)
+		}
 		// 从本节点移除
-		delete(n.Pods, terminatedPods[i].Name)
+		logrus.Tracef("Removing Pod %s from Node %s", pod.Name, n.Name)
+		key, _ := PodKeyFunc(pod)
+		delete(n.Pods, key)
 	}
 
 	// 执行调度算法
+	logrus.Debugf("Node %s Calculating cpu slots for ready pods", n.Name)
 	cpuState := n.Scheduler.Schedule(readyPods, n.CpuState)
 	for i := 0; i < len(cpuState); i++ {
 		for j := 0; j < len(cpuState[i]); j++ {
@@ -84,9 +97,11 @@ func (n *Node) Tick() *metrics.TickMetrics {
 	}
 
 	// 根据分配结果更新Pod的执行状态
+	logrus.Debugf("Node %s Updating Pod status", n.Name)
 	memUsed := 0
 	load := float64(0)
 	for i := 0; i < len(readyPods); i++ {
+		logrus.Tracef("Node %s Updating Pod %s status", n.Name, readyPods[i].Name)
 		cpuPressureReduction(podResource[i].slot, n.LastCpuUsage)
 		podResource[i].load, podResource[i].memUsage = readyPods[i].Algorithm.Tick(podResource[i].slot, podResource[i].mem)
 
@@ -98,6 +113,7 @@ func (n *Node) Tick() *metrics.TickMetrics {
 	// 更新节点的状态
 
 	// 根据Pod返回的负载信息，计算CPU统计数据
+	logrus.Debugf("Updating Node %s cpu and mem usage", n.Name)
 	cpuUsed := float64(0)
 	coreCount, _ := n.Status.Capacity.Cpu().AsInt64()
 	memSize, _ := n.Status.Capacity.Memory().AsInt64()
@@ -114,6 +130,10 @@ func (n *Node) Tick() *metrics.TickMetrics {
 
 	n.Status.Allocatable.Cpu().Set(coreCount - int64(cpuUsed))
 	n.Status.Allocatable.Memory().Set(memSize - int64(memUsed))
+	_, err := client.CoreV1().Nodes().UpdateStatus(context.TODO(), &n.Node, metav1.UpdateOptions{})
+	if err != nil {
+		logrus.Errorf("Update Node %s Status error: %v", n.Name, err)
+	}
 
 	return &metrics.TickMetrics{
 		CpuUsage: cpuUsage,

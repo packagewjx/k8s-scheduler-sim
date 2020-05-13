@@ -74,6 +74,7 @@ var (
 	}
 )
 
+// NewSchedulerSimulator 创建一个新的集群。totalTick为模拟集群的总运行周期。
 func NewSchedulerSimulator(totalTick int) *SchedSim {
 	rootCtx, cancel := context.WithCancel(context.Background())
 	sim := &SchedSim{
@@ -128,20 +129,23 @@ func (sim *SchedSim) Run() {
 			controller.Tick(sim)
 		}
 		// 等待bind
-
+		// FIXME 调度失败时，每次触发timeout
 		shouldBreak := false
+		bounded := 0
+		timeoutCh := time.After(time.Second)
 		for i := 0; i < sim.addCount && !shouldBreak; i++ {
 			logrus.Debugf("Waiting to schedule pod, %d remaining", sim.addCount)
 			select {
 			case <-sim.bindPodCh:
 				logrus.Debugf("Pod bind success")
-				sim.addCount--
-			case <-time.After(time.Second):
+				bounded++
+			case <-timeoutCh:
 				// 若调度超时则退出
-				logrus.Debugf("Schedule time out, %d remaining pod", sim.addCount)
+				logrus.Infof("Schedule time out, %d remaining pod", sim.addCount)
 				shouldBreak = true
 			}
 		}
+		sim.addCount -= bounded
 
 		logrus.Debug("Updating Node status")
 		nodes := sim.Nodes.List()

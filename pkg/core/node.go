@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"sync"
 )
 
 const (
@@ -26,6 +27,8 @@ type Node struct {
 
 	// 上一轮的CPU使用百分比，用于查看是否有资源竞争，模拟高资源竞争时CPU处理能力的下降
 	LastCpuUsage float64
+
+	bindLock sync.Mutex
 }
 
 func BuildNode(name string, cpu, mem, numPods, coreScheduler string) *v1.Node {
@@ -55,6 +58,9 @@ func BuildNode(name string, cpu, mem, numPods, coreScheduler string) *v1.Node {
 
 // TODO 可能会有一些绑定失败的条件，如内存不够用等
 func (n *Node) BindPod(pod *Pod) error {
+	n.bindLock.Lock()
+	defer n.bindLock.Unlock()
+
 	logrus.Infof("Binding Pod %s to Node %s", pod.Name, n.Name)
 
 	// 暂时使用pod.Name作为键

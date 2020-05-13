@@ -338,24 +338,37 @@ func TestPodClient(t *testing.T) {
 	}
 }
 
-func TestSchedSimRun(t *testing.T) {
+func TestDeploy10Tick(t *testing.T) {
 	logrus.SetLevel(logrus.DebugLevel)
 	simulator := NewSchedulerSimulator(200)
-	node := BuildNode("node-1", "10", "2G", "1000", FairScheduler)
+	node := BuildNode("node-1", "10", "2G", "5000", FairScheduler)
 	_, err := simulator.Client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 	if err != nil {
 		panic(err)
 	}
-	simulator.RegisterBeforeUpdateController(&mockDeployment{})
+	simulator.RegisterBeforeUpdateController(&deploy10TimesController{})
 
 	simulator.Run()
 }
 
-type mockDeployment struct {
+func TestDeployMultiplePods(t *testing.T) {
+	logrus.SetLevel(logrus.InfoLevel)
+	sim := NewSchedulerSimulator(300)
+	node := BuildNode("node-1", "10", "100G", "1000", FairScheduler)
+	_, err := sim.Client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+	if err != nil {
+		panic(err)
+	}
+	sim.RegisterBeforeUpdateController(&deployMultiplePodsController{})
+
+	sim.Run()
+}
+
+type deploy10TimesController struct {
 	phase int
 }
 
-func (m *mockDeployment) Tick(sim *SchedSim) {
+func (m *deploy10TimesController) Tick(sim *SchedSim) {
 	if m.phase < 10 {
 		state := &BatchPodState{
 			MemUsage:  1,
@@ -371,4 +384,23 @@ func (m *mockDeployment) Tick(sim *SchedSim) {
 	} else {
 		sim.DeleteBeforeController(m)
 	}
+}
+
+type deployMultiplePodsController struct {
+	phase int
+}
+
+func (d *deployMultiplePodsController) Tick(sim *SchedSim) {
+	state := &BatchPodState{
+		MemUsage:  1,
+		TotalTick: 100,
+	}
+	for i := 0; i < 1000; i++ {
+		pod, _ := BuildPod(fmt.Sprintf("pod-%d", i), 1, 1, BatchPodName, "null", state, v1.DefaultSchedulerName)
+		_, err := sim.Client.CoreV1().Pods(DefaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+		if err != nil {
+			panic(err)
+		}
+	}
+	sim.DeleteBeforeController(d)
 }

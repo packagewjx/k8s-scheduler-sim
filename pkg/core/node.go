@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/metrics"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
@@ -54,10 +55,13 @@ func BuildNode(name string, cpu, mem, numPods, coreScheduler string) *v1.Node {
 
 // TODO 可能会有一些绑定失败的条件，如内存不够用等
 func (n *Node) BindPod(pod *Pod) error {
-	logrus.Infof("Binding Pod %s to Node %s", n.Name, pod.Name)
+	logrus.Infof("Binding Pod %s to Node %s", pod.Name, n.Name)
 
 	// 暂时使用pod.Name作为键
 	key, _ := PodKeyFunc(pod)
+	if _, ok := n.Pods[key]; ok {
+		return fmt.Errorf("pod %s already bounded", key)
+	}
 	n.Pods[key] = pod
 	return nil
 }
@@ -94,6 +98,7 @@ func (n *Node) Tick(client kubernetes.Interface) *metrics.TickMetrics {
 			})
 		} else if pod.Status.Phase == v1.PodPending {
 			pod.Status.Phase = v1.PodRunning
+			pod.Spec.NodeName = n.Name
 			_, err := client.CoreV1().Pods(DefaultNamespace).UpdateStatus(context.TODO(), &pod.Pod, metav1.UpdateOptions{})
 			if err != nil {
 				logrus.Errorf("Error Updating Pod %s Status", pod.Name)

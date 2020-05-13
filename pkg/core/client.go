@@ -396,6 +396,11 @@ type coreV1NodeClient struct {
 }
 
 func (client *coreV1NodeClient) Create(_ context.Context, node *apicorev1.Node, _ apimachineryv1.CreateOptions) (*apicorev1.Node, error) {
+	nodeKey, _ := NodeKeyFunc(node)
+	if _, exist, _ := client.sim.Nodes.GetByKey(nodeKey); exist {
+		return nil, fmt.Errorf("duplicate node %s", node.Name)
+	}
+
 	// 创建CoreScheduler
 	schedulerName := node.Annotations[NodeAnnotationCoreScheduler]
 	scheduler, exist := GetCoreScheduler(schedulerName)
@@ -575,6 +580,12 @@ type coreV1PodClient struct {
 }
 
 func (c *coreV1PodClient) Create(_ context.Context, pod *apicorev1.Pod, _ apimachineryv1.CreateOptions) (*apicorev1.Pod, error) {
+	// 检查是否有重复的Pod，拒绝名称相同的Pod加入
+	podKey, _ := PodKeyFunc(pod)
+	if _, exist, _ := c.sim.Pods.GetByKey(podKey); exist {
+		return nil, fmt.Errorf("duplicate pod %s", pod.Name)
+	}
+
 	cpuLimit, err := strconv.ParseFloat(pod.Annotations[PodAnnotationCpuLimit], 64)
 	if err != nil {
 		return nil, errors.Wrap(err, "Error parsing cpulimit")
@@ -629,6 +640,9 @@ func (c *coreV1PodClient) Create(_ context.Context, pod *apicorev1.Pod, _ apimac
 	if err != nil {
 		logrus.Errorf("Error publishing add event: %v", err)
 	}
+
+	// 通知SchedSim已经加了新的Pod
+	c.sim.podAdded()
 
 	return pod, nil
 }
@@ -792,6 +806,8 @@ func (c *coreV1PodClient) Bind(_ context.Context, binding *apicorev1.Binding, _ 
 	if err != nil {
 		return errors.Wrap(err, "bind error")
 	}
+
+	c.sim.podBounded()
 
 	return nil
 }

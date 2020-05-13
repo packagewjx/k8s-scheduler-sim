@@ -38,6 +38,10 @@ type SchedSim struct {
 
 	// AfterUpdate 在更新Pod状态之后调用的控制器函数，通常用于监控统计等
 	AfterUpdate []Controller
+
+	// 用于控制调度器调度添加速率的两个通道
+	addCount  int
+	bindPodCh chan bool
 }
 
 var (
@@ -81,6 +85,7 @@ func NewSchedulerSimulator(totalTick int) *SchedSim {
 		Scheduler:             nil,
 		TotalTick:             totalTick,
 		cancelFunc:            cancel,
+		bindPodCh:             make(chan bool),
 	}
 
 	client, err := NewClient(sim)
@@ -118,8 +123,24 @@ func (sim *SchedSim) Run() {
 	for tick := 0; tick < sim.TotalTick; tick++ {
 		logrus.Infof("Tick %d", tick)
 		logrus.Debug("Running BeforeUpdate Controllers")
+
 		for _, controller := range sim.BeforeUpdate {
 			controller.Tick(sim)
+		}
+		// 等待bind
+
+		shouldBreak := false
+		for i := 0; i < sim.addCount && !shouldBreak; i++ {
+			logrus.Debugf("Waiting to schedule pod, %d remaining", sim.addCount)
+			select {
+			case <-sim.bindPodCh:
+				logrus.Debugf("Pod bind success")
+				sim.addCount--
+			case <-time.After(time.Second):
+				// 若调度超时则退出
+				logrus.Debugf("Schedule time out, %d remaining pod", sim.addCount)
+				shouldBreak = true
+			}
 		}
 
 		logrus.Debug("Updating Node status")
@@ -208,4 +229,12 @@ func (sim *SchedSim) deleteController(controller Controller, timing controllerTi
 		(*arr)[idx] = (*arr)[len(*arr)-1]
 		*arr = (*arr)[:len(*arr)-1]
 	}
+}
+
+func (sim *SchedSim) podAdded() {
+	sim.addCount++
+}
+
+func (sim *SchedSim) podBounded() {
+	sim.bindPodCh <- true
 }

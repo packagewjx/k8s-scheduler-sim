@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -338,7 +339,8 @@ func TestPodClient(t *testing.T) {
 }
 
 func TestSchedSimRun(t *testing.T) {
-	simulator := NewSchedulerSimulator(1000)
+	logrus.SetLevel(logrus.DebugLevel)
+	simulator := NewSchedulerSimulator(200)
 	node := BuildNode("node-1", "10", "2G", "1000", FairScheduler)
 	_, err := simulator.Client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 	if err != nil {
@@ -354,19 +356,19 @@ type mockDeployment struct {
 }
 
 func (m *mockDeployment) Tick(sim *SchedSim) {
-	if m.phase == 0 {
+	if m.phase < 10 {
 		state := &BatchPodState{
 			MemUsage:  1,
 			TotalTick: 100,
 		}
-		pod, _ := BuildPod("pod-1", 1, 1, BatchPodName, "null", state, v1.DefaultSchedulerName)
+		pod, _ := BuildPod(fmt.Sprintf("pod-%d", m.phase), 1, 1, BatchPodName, "null", state, v1.DefaultSchedulerName)
 		_, err := sim.Client.CoreV1().Pods(DefaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			panic(err)
 		}
 
 		m.phase++
-	} else if m.phase == 1 {
+	} else {
 		sim.DeleteBeforeController(m)
 	}
 }

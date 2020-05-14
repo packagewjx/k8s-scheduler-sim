@@ -420,6 +420,7 @@ func (client *coreV1NodeClient) Create(_ context.Context, node *apicorev1.Node, 
 		Pods:         map[string]*Pod{},
 		CpuState:     make([][]*RunEntity, numCpu),
 		LastCpuUsage: 0,
+		Client:       client.sim.Client,
 	}
 
 	err := client.sim.Nodes.Add(simNode)
@@ -642,7 +643,7 @@ func (c *coreV1PodClient) Create(_ context.Context, pod *apicorev1.Pod, _ apimac
 	}
 
 	// 通知SchedSim已经加了新的Pod
-	c.sim.podAdded()
+	c.sim.podAdded(pod.Name)
 
 	return pod, nil
 }
@@ -700,6 +701,15 @@ func (c *coreV1PodClient) UpdateStatus(_ context.Context, pod *apicorev1.Pod, _ 
 	err = util.GetMessageQueue().Publish(TopicPod, ev)
 	if err != nil {
 		logrus.Errorf("Error publishing update event: %v", err)
+	}
+
+	// 检查是否调度失败。
+	for _, condition := range pod.Status.Conditions {
+		if condition.Reason == apicorev1.PodReasonUnschedulable {
+			// 通知调度失败
+			c.sim.podScheduledFailed(pod.Name)
+			break
+		}
 	}
 
 	return pod, nil
@@ -807,7 +817,7 @@ func (c *coreV1PodClient) Bind(_ context.Context, binding *apicorev1.Binding, _ 
 		return errors.Wrap(err, "bind error")
 	}
 
-	c.sim.podBounded()
+	c.sim.podScheduledSuccess(pod.Name)
 
 	return nil
 }

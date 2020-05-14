@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/metrics"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -29,6 +30,8 @@ type Node struct {
 	LastCpuUsage float64
 
 	bindLock sync.Mutex
+
+	Client kubernetes.Interface
 }
 
 func BuildNode(name string, cpu, mem, numPods, coreScheduler string) *v1.Node {
@@ -69,6 +72,13 @@ func (n *Node) BindPod(pod *Pod) error {
 		return fmt.Errorf("pod %s already bounded", key)
 	}
 	n.Pods[key] = pod
+
+	pod.Spec.NodeName = n.Name
+	_, err := n.Client.CoreV1().Pods(DefaultNamespace).UpdateStatus(context.TODO(), &pod.Pod, metav1.UpdateOptions{})
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("error updating status of pod %s", pod.Name))
+	}
+
 	return nil
 }
 

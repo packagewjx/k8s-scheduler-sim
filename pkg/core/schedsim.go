@@ -14,6 +14,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"time"
+
+	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
 const DefaultNamespace = ""
@@ -41,7 +43,7 @@ type SchedSim struct {
 
 	// 用于控制调度器调度添加速率的两个通道
 	addCount  int
-	bindPodCh chan bool
+	bindPodCh chan string
 }
 
 var (
@@ -74,6 +76,12 @@ var (
 	}
 )
 
+func init() {
+	logrus.SetFormatter(&prefixed.TextFormatter{
+		ForceFormatting: true,
+	})
+}
+
 // NewSchedulerSimulator 创建一个新的集群。totalTick为模拟集群的总运行周期。
 func NewSchedulerSimulator(totalTick int) *SchedSim {
 	rootCtx, cancel := context.WithCancel(context.Background())
@@ -86,7 +94,7 @@ func NewSchedulerSimulator(totalTick int) *SchedSim {
 		Scheduler:             nil,
 		TotalTick:             totalTick,
 		cancelFunc:            cancel,
-		bindPodCh:             make(chan bool),
+		bindPodCh:             make(chan string),
 	}
 
 	client, err := NewClient(sim)
@@ -128,24 +136,28 @@ func (sim *SchedSim) Run() {
 		for _, controller := range sim.BeforeUpdate {
 			controller.Tick(sim)
 		}
-		// 等待bind
-		// FIXME 调度失败时，每次触发timeout
+		//等待bind
 		shouldBreak := false
-		bounded := 0
 		timeoutCh := time.After(time.Second)
+		completed := 0
 		for i := 0; i < sim.addCount && !shouldBreak; i++ {
 			logrus.Debugf("Waiting to schedule pod, %d remaining", sim.addCount)
 			select {
-			case <-sim.bindPodCh:
-				logrus.Debugf("Pod bind success")
-				bounded++
+			case res := <-sim.bindPodCh:
+				completed++
+				podName := res[1:]
+				if res[0] == 'T' {
+					logrus.Debugf("Pod %s bind success", podName)
+				} else /*F*/ {
+					logrus.Infof("Pod %s scheduled failed", podName)
+				}
 			case <-timeoutCh:
 				// 若调度超时则退出
 				logrus.Infof("Schedule time out, %d remaining pod", sim.addCount)
 				shouldBreak = true
 			}
 		}
-		sim.addCount -= bounded
+		sim.addCount -= completed
 
 		logrus.Debug("Updating Node status")
 		nodes := sim.Nodes.List()
@@ -235,10 +247,18 @@ func (sim *SchedSim) deleteController(controller Controller, timing controllerTi
 	}
 }
 
-func (sim *SchedSim) podAdded() {
+// podAdded 通知创建了新的Pod。注意，本函数应该运行在与SchedSim不同的Goroutine中，否则会永久阻塞。‘
+// 由于通道无法保证完全的同步，因此使用本方法同步的通知
+func (sim *SchedSim) podAdded(podName string) {
 	sim.addCount++
 }
 
-func (sim *SchedSim) podBounded() {
-	sim.bindPodCh <- true
+// podScheduledFailed 通知调度成功。注意，本函数应该运行在与SchedSim不同的Goroutine中，否则会永久阻塞。
+func (sim *SchedSim) podScheduledSuccess(podName string) {
+	sim.bindPodCh <- "T" + podName
+}
+
+// podScheduledFailed 通知调度失败。注意，本函数应该运行在与SchedSim不同的Goroutine中，否则会永久阻塞。
+func (sim *SchedSim) podScheduledFailed(podName string) {
+	sim.bindPodCh <- "F" + podName
 }

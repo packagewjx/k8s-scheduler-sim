@@ -54,13 +54,12 @@ func TestScheduleOne(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create pod failed: %v", err)
 	}
-
-	<-time.After(2 * time.Second)
 }
 
 func TestNodeClient(t *testing.T) {
 	logrus.SetLevel(logrus.DebugLevel)
 	sim := NewSchedulerSimulator(1000)
+	defer sim.cancelFunc()
 
 	nodeClient := sim.Client.CoreV1().Nodes()
 
@@ -211,6 +210,8 @@ func TestNodeClient(t *testing.T) {
 
 func TestPodClient(t *testing.T) {
 	sim := NewSchedulerSimulator(1000)
+	defer sim.cancelFunc()
+
 	podClient := sim.Client.CoreV1().Pods(DefaultNamespace)
 	podInformer := sim.InformerFactory.Core().V1().Pods().Informer()
 	ch := make(chan bool)
@@ -359,7 +360,20 @@ func TestDeployMultiplePods(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	sim.RegisterBeforeUpdateController(&deployMultiplePodsController{})
+	sim.RegisterBeforeUpdateController(&deployMultiplePodsController{1000})
+
+	sim.Run()
+}
+
+func TestDeployPodExceedLimit(t *testing.T) {
+	logrus.SetLevel(logrus.InfoLevel)
+	sim := NewSchedulerSimulator(1000)
+	node := BuildNode("node-1", "10", "100G", "10", FairScheduler)
+	_, err := sim.Client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+	if err != nil {
+		panic(err)
+	}
+	sim.RegisterBeforeUpdateController(&deployMultiplePodsController{100})
 
 	sim.Run()
 }
@@ -387,7 +401,7 @@ func (m *deploy10TimesController) Tick(sim *SchedSim) {
 }
 
 type deployMultiplePodsController struct {
-	phase int
+	podNum int
 }
 
 func (d *deployMultiplePodsController) Tick(sim *SchedSim) {
@@ -395,7 +409,7 @@ func (d *deployMultiplePodsController) Tick(sim *SchedSim) {
 		MemUsage:  1,
 		TotalTick: 100,
 	}
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < d.podNum; i++ {
 		pod, _ := BuildPod(fmt.Sprintf("pod-%d", i), 1, 1, BatchPodName, "null", state, v1.DefaultSchedulerName)
 		_, err := sim.Client.CoreV1().Pods(DefaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {

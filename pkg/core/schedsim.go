@@ -36,10 +36,10 @@ type SchedSim struct {
 	TotalTick int
 
 	// BeforeUpdate 在更新Pod状态与Node状态之前调用的控制器函数
-	BeforeUpdate []Controller
+	beforeUpdate []Controller
 
 	// AfterUpdate 在更新Pod状态之后调用的控制器函数，通常用于监控统计等
-	AfterUpdate []Controller
+	afterUpdate []Controller
 
 	// 用于控制调度器调度添加速率的两个通道
 	addCount  int
@@ -133,8 +133,8 @@ func (sim *SchedSim) Run() {
 		logrus.Infof("Tick %d", tick)
 		logrus.Debug("Running BeforeUpdate Controllers")
 
-		for _, controller := range sim.BeforeUpdate {
-			controller.Tick(sim)
+		for _, controller := range sim.beforeUpdate {
+			controller.Tick()
 		}
 		//等待bind
 		shouldBreak := false
@@ -187,8 +187,8 @@ func (sim *SchedSim) Run() {
 
 		logrus.Debug("Running AfterUpdate Controllers")
 		// 运行后更新控制器
-		for _, controller := range sim.AfterUpdate {
-			controller.Tick(sim)
+		for _, controller := range sim.afterUpdate {
+			controller.Tick()
 		}
 	}
 
@@ -201,12 +201,16 @@ var (
 	afterUpdate  = controllerTiming(2)
 )
 
-func (sim *SchedSim) RegisterBeforeUpdateController(controller Controller) {
+func (sim *SchedSim) RegisterBeforeUpdateController(factory ControllerFactory) Controller {
+	controller := factory(sim)
 	sim.registerController(controller, beforeUpdate)
+	return controller
 }
 
-func (sim *SchedSim) RegisterAfterUpdateController(controller Controller) {
+func (sim *SchedSim) RegisterAfterUpdateController(factory ControllerFactory) Controller {
+	controller := factory(sim)
 	sim.registerController(controller, afterUpdate)
+	return controller
 }
 
 func (sim *SchedSim) DeleteBeforeController(controller Controller) {
@@ -220,9 +224,9 @@ func (sim *SchedSim) DeleteAfterController(controller Controller) {
 func (sim *SchedSim) registerController(controller Controller, timing controllerTiming) {
 	switch timing {
 	case beforeUpdate:
-		sim.BeforeUpdate = append(sim.BeforeUpdate, controller)
+		sim.beforeUpdate = append(sim.beforeUpdate, controller)
 	case afterUpdate:
-		sim.AfterUpdate = append(sim.AfterUpdate, controller)
+		sim.afterUpdate = append(sim.afterUpdate, controller)
 	}
 }
 
@@ -230,9 +234,9 @@ func (sim *SchedSim) deleteController(controller Controller, timing controllerTi
 	var arr *[]Controller
 	switch timing {
 	case beforeUpdate:
-		arr = &sim.BeforeUpdate
+		arr = &sim.beforeUpdate
 	case afterUpdate:
-		arr = &sim.AfterUpdate
+		arr = &sim.afterUpdate
 	default:
 		panic("Invalid argument")
 	}

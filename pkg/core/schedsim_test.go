@@ -347,7 +347,11 @@ func TestDeploy10Tick(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	simulator.RegisterBeforeUpdateController(&deploy10TimesController{})
+	simulator.RegisterBeforeUpdateController(func(sim *SchedSim) Controller {
+		return &deploy10TimesController{
+			sim: sim,
+		}
+	})
 
 	simulator.Run()
 }
@@ -360,7 +364,12 @@ func TestDeployMultiplePods(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	sim.RegisterBeforeUpdateController(&deployMultiplePodsController{1000})
+	sim.RegisterBeforeUpdateController(func(sim *SchedSim) Controller {
+		return &deployMultiplePodsController{
+			sim:    sim,
+			podNum: 100,
+		}
+	})
 
 	sim.Run()
 }
@@ -373,48 +382,55 @@ func TestDeployPodExceedLimit(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	sim.RegisterBeforeUpdateController(&deployMultiplePodsController{100})
+	sim.RegisterBeforeUpdateController(func(sim *SchedSim) Controller {
+		return &deployMultiplePodsController{
+			sim:    sim,
+			podNum: 100,
+		}
+	})
 
 	sim.Run()
 }
 
 type deploy10TimesController struct {
 	phase int
+	sim   *SchedSim
 }
 
-func (m *deploy10TimesController) Tick(sim *SchedSim) {
+func (m *deploy10TimesController) Tick() {
 	if m.phase < 10 {
 		state := &BatchPodState{
 			MemUsage:  1,
 			TotalTick: 100,
 		}
 		pod, _ := BuildPod(fmt.Sprintf("pod-%d", m.phase), 1, 1, BatchPodName, "null", state, v1.DefaultSchedulerName)
-		_, err := sim.Client.CoreV1().Pods(DefaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+		_, err := m.sim.Client.CoreV1().Pods(DefaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			panic(err)
 		}
 
 		m.phase++
 	} else {
-		sim.DeleteBeforeController(m)
+		m.sim.DeleteBeforeController(m)
 	}
 }
 
 type deployMultiplePodsController struct {
+	sim    *SchedSim
 	podNum int
 }
 
-func (d *deployMultiplePodsController) Tick(sim *SchedSim) {
+func (d *deployMultiplePodsController) Tick() {
 	state := &BatchPodState{
 		MemUsage:  1,
 		TotalTick: 100,
 	}
 	for i := 0; i < d.podNum; i++ {
 		pod, _ := BuildPod(fmt.Sprintf("pod-%d", i), 1, 1, BatchPodName, "null", state, v1.DefaultSchedulerName)
-		_, err := sim.Client.CoreV1().Pods(DefaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+		_, err := d.sim.Client.CoreV1().Pods(DefaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			panic(err)
 		}
 	}
-	sim.DeleteBeforeController(d)
+	d.sim.DeleteBeforeController(d)
 }

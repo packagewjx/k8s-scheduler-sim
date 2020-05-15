@@ -84,7 +84,8 @@
     - [x] 模拟节点运行逻辑设计
     - [x] 整合Kubernetes API的Node
   - [ ] DeploymentController设计
-  - [ ] 待定：Service设计
+  - [ ] Service设计
+    - [ ] Service的PodAlgorithm设计
     - [ ] Service逻辑设计，如控制Pod的负载
     - [ ] Service响应时间监控
   - [ ] client-go接口实现
@@ -95,8 +96,6 @@
   - [x] 调度Pod
     - [x] 将新的Pod放入调度队列
     - [x] 将Pod与Node绑定
-  - [ ] 调度器插件编写
-    - [ ] 调度成功的通知PostBind插件
 - [ ] 监控系统的设计
   - [x] 监控数据设计
   - [x] 节点监控数据采集

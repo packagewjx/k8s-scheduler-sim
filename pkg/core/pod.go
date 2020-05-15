@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 )
 
+// TODO 新增Pod包，放入PodAlgorithm的实现
 type Pod struct {
 	v1.Pod
 
@@ -72,6 +73,7 @@ func BuildPod(name string, cpuLimit float64, memLimit int, algorithm string, dep
 	}, nil
 }
 
+// TODO 将内存值改为int64
 type PodAlgorithm interface {
 	// 返回当前一个时钟滴答内的使用率。
 	// slot 为Pod分配到的时间片的大小的数组，每个值取值0～1，数组长度代表分配到的CPU数量。在负载一定的情况下，
@@ -88,10 +90,12 @@ type PodAlgorithm interface {
 	ResourceRequest() (cpu float64, mem int)
 }
 
-type PodAlgorithmFactory func(stateJson string, pod *Pod) (PodAlgorithm, error)
+type PodAlgorithmFactory func(argJson string, pod *Pod) (PodAlgorithm, error)
 
-var podAlgorithmMap = map[string]PodAlgorithmFactory{
-	BatchPodName: BatchPodFactory,
+var podAlgorithmMap = make(map[string]PodAlgorithmFactory)
+
+func RegisterPodAlgorithmFactory(name string, factory PodAlgorithmFactory) {
+	podAlgorithmMap[name] = factory
 }
 
 func GetPodAlgorithmFactory(name string) (factory PodAlgorithmFactory, exist bool) {

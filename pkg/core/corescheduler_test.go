@@ -22,7 +22,7 @@ func TestFairScheduler(t *testing.T) {
 	sched, _ := GetCoreScheduler(FairScheduler)
 	readyPods := make([]*Pod, 10)
 	for i := 0; i < len(readyPods); i++ {
-		p, _ := BuildPod(fmt.Sprintf("pod-%d", i), 1, 1, BatchPodName, "null", "", v1.DefaultSchedulerName)
+		p, _ := BuildPod(fmt.Sprintf("pod-%d", i), 1, 1, BatchPod, "null", "", v1.DefaultSchedulerName)
 		pod := &Pod{
 			Pod:       *p,
 			CpuLimit:  1,

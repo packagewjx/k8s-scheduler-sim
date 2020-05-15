@@ -45,7 +45,7 @@ func TestScheduleOne(t *testing.T) {
 		t.Fatalf("node create fail: %v", err)
 	}
 
-	pod, _ := BuildPod("pod-1", 1, 100, BatchPodName, "null", &BatchPodState{
+	pod, _ := BuildPod("pod-1", 1, 100, BatchPod, "null", &BatchPodState{
 		MemUsage:  100,
 		TotalTick: 100,
 	}, v1.DefaultSchedulerName)
@@ -238,7 +238,7 @@ func TestPodClient(t *testing.T) {
 			Labels: map[string]string{},
 			Annotations: map[string]string{
 				PodAnnotationDeploymentController: "null",
-				PodAnnotationAlgorithm:            BatchPodName,
+				PodAnnotationAlgorithm:            BatchPod,
 				PodAnnotationMemLimit:             "1000",
 				PodAnnotationCpuLimit:             "1",
 			},
@@ -403,7 +403,7 @@ func (m *deploy10TimesController) Tick() {
 			MemUsage:  1,
 			TotalTick: 100,
 		}
-		pod, _ := BuildPod(fmt.Sprintf("pod-%d", m.phase), 1, 1, BatchPodName, "null", state, v1.DefaultSchedulerName)
+		pod, _ := BuildPod(fmt.Sprintf("pod-%d", m.phase), 1, 1, BatchPod, "null", state, v1.DefaultSchedulerName)
 		_, err := m.sim.Client.CoreV1().Pods(DefaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			panic(err)
@@ -426,7 +426,7 @@ func (d *deployMultiplePodsController) Tick() {
 		TotalTick: 100,
 	}
 	for i := 0; i < d.podNum; i++ {
-		pod, _ := BuildPod(fmt.Sprintf("pod-%d", i), 1, 1, BatchPodName, "null", state, v1.DefaultSchedulerName)
+		pod, _ := BuildPod(fmt.Sprintf("pod-%d", i), 1, 1, BatchPod, "null", state, v1.DefaultSchedulerName)
 		_, err := d.sim.Client.CoreV1().Pods(DefaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			panic(err)

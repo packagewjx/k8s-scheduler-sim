@@ -18,7 +18,7 @@ type BatchPodState struct {
 	TotalTick float64 `json:"totalTick"`
 }
 
-const BatchPodName = "BatchPod"
+const BatchPod = "BatchPod"
 
 var BatchPodFactory PodAlgorithmFactory = func(stateJson string, pod *Pod) (PodAlgorithm, error) {
 	state := &BatchPodState{}

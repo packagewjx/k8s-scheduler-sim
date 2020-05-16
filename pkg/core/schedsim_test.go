@@ -7,10 +7,32 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/tools/cache"
 	"testing"
 	"time"
 )
+
+func newFakePod(name string) *v1.Pod {
+	return &v1.Pod{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Annotations: map[string]string{
+				PodAnnotationCpuLimit:             "1",
+				PodAnnotationMemLimit:             "1",
+				PodAnnotationDeploymentController: "null",
+				PodAnnotationAlgorithm:            testPod,
+				PodAnnotationInitialState:         "",
+			},
+			UID: uuid.NewUUID(),
+		},
+		Spec: v1.PodSpec{SchedulerName: v1.DefaultSchedulerName},
+		Status: v1.PodStatus{
+			Phase: v1.PodPending,
+		},
+	}
+}
 
 func TestScheduleOne(t *testing.T) {
 	logrus.SetLevel(logrus.TraceLevel)
@@ -45,14 +67,24 @@ func TestScheduleOne(t *testing.T) {
 		t.Fatalf("node create fail: %v", err)
 	}
 
-	pod, _ := BuildPod("pod-1", 1, 100, BatchPod, "null", &BatchPodState{
-		MemUsage:  100,
-		TotalTick: 100,
-	}, v1.DefaultSchedulerName)
+	// wait for node creation event
+	<-time.After(50 * time.Millisecond)
+
+	podName := "fakepod"
+	pod := newFakePod(podName)
 
 	pod, err = sim.Client.CoreV1().Pods(DefaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("create pod failed: %v", err)
+	}
+
+	select {
+	case str := <-sim.bindPodCh:
+		if str[0] != 'T' {
+			t.Error("Schedule failed")
+		}
+	case <-time.After(time.Second):
+		t.Error("Schedule failed")
 	}
 }
 
@@ -238,7 +270,7 @@ func TestPodClient(t *testing.T) {
 			Labels: map[string]string{},
 			Annotations: map[string]string{
 				PodAnnotationDeploymentController: "null",
-				PodAnnotationAlgorithm:            BatchPod,
+				PodAnnotationAlgorithm:            testPod,
 				PodAnnotationMemLimit:             "1000",
 				PodAnnotationCpuLimit:             "1",
 			},
@@ -340,7 +372,6 @@ func TestPodClient(t *testing.T) {
 }
 
 func TestDeploy10Tick(t *testing.T) {
-	logrus.SetLevel(logrus.DebugLevel)
 	simulator := NewSchedulerSimulator(200)
 	node := BuildNode("node-1", "10", "2G", "5000", FairScheduler)
 	_, err := simulator.Client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
@@ -399,11 +430,7 @@ type deploy10TimesController struct {
 
 func (m *deploy10TimesController) Tick() {
 	if m.phase < 10 {
-		state := &BatchPodState{
-			MemUsage:  1,
-			TotalTick: 100,
-		}
-		pod, _ := BuildPod(fmt.Sprintf("pod-%d", m.phase), 1, 1, BatchPod, "null", state, v1.DefaultSchedulerName)
+		pod := newFakePod(fmt.Sprintf("pod-%d", m.phase))
 		_, err := m.sim.Client.CoreV1().Pods(DefaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			panic(err)
@@ -421,12 +448,8 @@ type deployMultiplePodsController struct {
 }
 
 func (d *deployMultiplePodsController) Tick() {
-	state := &BatchPodState{
-		MemUsage:  1,
-		TotalTick: 100,
-	}
 	for i := 0; i < d.podNum; i++ {
-		pod, _ := BuildPod(fmt.Sprintf("pod-%d", i), 1, 1, BatchPod, "null", state, v1.DefaultSchedulerName)
+		pod := newFakePod(fmt.Sprintf("pod-%d", i))
 		_, err := d.sim.Client.CoreV1().Pods(DefaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			panic(err)

@@ -251,18 +251,18 @@ func (sim *SchedSim) deleteController(controller Controller, timing controllerTi
 	}
 }
 
-// podAdded 通知创建了新的Pod。注意，本函数应该运行在与SchedSim不同的Goroutine中，否则会永久阻塞。‘
+// PodAdded 通知创建了新的Pod。注意，本函数应该运行在与SchedSim不同的Goroutine中，否则会永久阻塞。‘
 // 由于通道无法保证完全的同步，因此使用本方法同步的通知
-func (sim *SchedSim) podAdded(podName string) {
+func (sim *SchedSim) PodAdded(podName string) {
 	sim.addCount++
 }
 
-// podScheduledFailed 通知调度成功。注意，本函数应该运行在与SchedSim不同的Goroutine中，否则会永久阻塞。
-func (sim *SchedSim) podScheduledSuccess(podName string) {
+// PodScheduledSuccess 通知调度成功。注意，本函数应该运行在与SchedSim不同的Goroutine中，否则会永久阻塞。
+func (sim *SchedSim) PodScheduledSuccess(podName string) {
 	sim.bindPodCh <- "T" + podName
 }
 
-// podScheduledFailed 通知调度失败。注意，本函数应该运行在与SchedSim不同的Goroutine中，否则会永久阻塞。
-func (sim *SchedSim) podScheduledFailed(podName string) {
+// PodScheduledFailed 通知调度失败。注意，本函数应该运行在与SchedSim不同的Goroutine中，否则会永久阻塞。
+func (sim *SchedSim) PodScheduledFailed(podName string) {
 	sim.bindPodCh <- "F" + podName
 }

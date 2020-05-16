@@ -1,8 +1,9 @@
-package core
+package pods
 
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/packagewjx/k8s-scheduler-sim/pkg/core"
 	"k8s.io/api/core/v1"
 	"math"
 	"testing"
@@ -11,7 +12,7 @@ import (
 func TestServicePod(t *testing.T) {
 	baseMem := int64(300 * (1 << 20))
 	argByte, _ := json.Marshal(&SimServicePodArgs{BaseMem: baseMem})
-	pod := &Pod{
+	pod := &core.Pod{
 		Pod:       v1.Pod{},
 		CpuLimit:  4,
 		MemLimit:  1 << 30,
@@ -53,7 +54,7 @@ func TestServicePod(t *testing.T) {
 
 func TestSingleCPU(t *testing.T) {
 	argByte, _ := json.Marshal(&SimServicePodArgs{BaseMem: 0})
-	pod := &Pod{
+	pod := &core.Pod{
 		Pod:       v1.Pod{},
 		CpuLimit:  1,
 		MemLimit:  1 << 30,
@@ -180,7 +181,7 @@ func TestSingleCPU(t *testing.T) {
 
 func TestMaxProbing(t *testing.T) {
 	argByte, _ := json.Marshal(&SimServicePodArgs{BaseMem: 0})
-	pod := &Pod{
+	pod := &core.Pod{
 		Pod:       v1.Pod{},
 		CpuLimit:  1,
 		MemLimit:  1 << 30,

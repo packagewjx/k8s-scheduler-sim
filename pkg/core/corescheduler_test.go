@@ -2,7 +2,6 @@ package core
 
 import (
 	"fmt"
-	v1 "k8s.io/api/core/v1"
 	"math"
 	"testing"
 )
@@ -22,9 +21,9 @@ func TestFairScheduler(t *testing.T) {
 	sched, _ := GetCoreScheduler(FairScheduler)
 	readyPods := make([]*Pod, 10)
 	for i := 0; i < len(readyPods); i++ {
-		p, _ := BuildPod(fmt.Sprintf("pod-%d", i), 1, 1, BatchPod, "null", "", v1.DefaultSchedulerName)
+		fakePod := newFakePod(fmt.Sprintf("pod-%d", i))
 		pod := &Pod{
-			Pod:       *p,
+			Pod:       *fakePod,
 			CpuLimit:  1,
 			MemLimit:  1,
 			Algorithm: &mockAlgorithm{},

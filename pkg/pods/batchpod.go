@@ -1,14 +1,15 @@
-package core
+package pods
 
 import (
 	"encoding/json"
+	"github.com/packagewjx/k8s-scheduler-sim/pkg/core"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 )
 
 // batchPodAlgorithm 模拟批处理任务的Pod，默认一直在跑任务，因此负载一直为1，内存使用基本固定
 type batchPodAlgorithm struct {
-	Pod       *Pod
+	Pod       *core.Pod
 	MemUsage  int
 	TotalTick float64
 }
@@ -20,7 +21,7 @@ type BatchPodState struct {
 
 const BatchPod = "BatchPod"
 
-var BatchPodFactory PodAlgorithmFactory = func(stateJson string, pod *Pod) (PodAlgorithm, error) {
+var BatchPodFactory core.PodAlgorithmFactory = func(stateJson string, pod *core.Pod) (core.PodAlgorithm, error) {
 	state := &BatchPodState{}
 	if stateJson != "" {
 		err := json.Unmarshal([]byte(stateJson), state)

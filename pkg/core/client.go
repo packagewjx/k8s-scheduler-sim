@@ -643,7 +643,7 @@ func (c *coreV1PodClient) Create(_ context.Context, pod *apicorev1.Pod, _ apimac
 	}
 
 	// 通知SchedSim已经加了新的Pod
-	c.sim.podAdded(pod.Name)
+	c.sim.PodAdded(pod.Name)
 
 	return pod, nil
 }
@@ -707,7 +707,7 @@ func (c *coreV1PodClient) UpdateStatus(_ context.Context, pod *apicorev1.Pod, _ 
 	for _, condition := range pod.Status.Conditions {
 		if condition.Reason == apicorev1.PodReasonUnschedulable {
 			// 通知调度失败
-			c.sim.podScheduledFailed(pod.Name)
+			c.sim.PodScheduledFailed(pod.Name)
 			break
 		}
 	}
@@ -817,7 +817,7 @@ func (c *coreV1PodClient) Bind(_ context.Context, binding *apicorev1.Binding, _ 
 		return errors.Wrap(err, "bind error")
 	}
 
-	c.sim.podScheduledSuccess(pod.Name)
+	c.sim.PodScheduledSuccess(pod.Name)
 
 	return nil
 }

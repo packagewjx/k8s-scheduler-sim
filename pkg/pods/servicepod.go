@@ -1,9 +1,10 @@
-package core
+package pods
 
 import (
 	"container/heap"
 	"container/list"
 	"encoding/json"
+	"github.com/packagewjx/k8s-scheduler-sim/pkg/core"
 	"github.com/pkg/errors"
 )
 
@@ -16,7 +17,7 @@ import (
 // 2）因服务器负载高，而导致的Cache不命中，内存访问变慢等的额外IO开销
 // 3）由于负载过高导致的激烈竞争
 type ServicePod interface {
-	PodAlgorithm
+	core.PodAlgorithm
 
 	// GetLoad 获取当前Pod的负载大小。用于让控制器负载均衡。具体的计算，可以根据当前Pod能够处理的容量，以及内存使用量决定
 	// 返回的结果应该是在[0,1]区间。
@@ -47,7 +48,7 @@ type ServiceContext struct {
 
 const SimServicePod = "SimServicePod"
 
-var simServicePodFacory PodAlgorithmFactory = func(argJson string, pod *Pod) (PodAlgorithm, error) {
+var simServicePodFacory core.PodAlgorithmFactory = func(argJson string, pod *core.Pod) (core.PodAlgorithm, error) {
 	arg := &SimServicePodArgs{}
 	err := json.Unmarshal([]byte(argJson), arg)
 	if err != nil {

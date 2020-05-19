@@ -62,7 +62,7 @@ func TestScheduleOne(t *testing.T) {
 			Phase: v1.NodeRunning,
 		},
 	}
-	node, err := sim.Client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+	node, err := sim.GetKubernetesClient().CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("node create fail: %v", err)
 	}
@@ -73,13 +73,13 @@ func TestScheduleOne(t *testing.T) {
 	podName := "fakepod"
 	pod := newFakePod(podName)
 
-	pod, err = sim.Client.CoreV1().Pods(DefaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+	pod, err = sim.GetKubernetesClient().CoreV1().Pods(DefaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("create pod failed: %v", err)
 	}
 
 	select {
-	case str := <-sim.bindPodCh:
+	case str := <-sim.(*schedSim).bindPodCh:
 		if str[0] != 'T' {
 			t.Error("Schedule failed")
 		}
@@ -91,11 +91,11 @@ func TestScheduleOne(t *testing.T) {
 func TestNodeClient(t *testing.T) {
 	logrus.SetLevel(logrus.DebugLevel)
 	sim := NewSchedulerSimulator(1000)
-	defer sim.cancelFunc()
+	defer sim.(*schedSim).cancelFunc()
 
-	nodeClient := sim.Client.CoreV1().Nodes()
+	nodeClient := sim.GetKubernetesClient().CoreV1().Nodes()
 
-	informer := sim.InformerFactory.Core().V1().Nodes().Informer()
+	informer := sim.GetInformerFactory().Core().V1().Nodes().Informer()
 
 	ch := make(chan bool)
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -242,10 +242,10 @@ func TestNodeClient(t *testing.T) {
 
 func TestPodClient(t *testing.T) {
 	sim := NewSchedulerSimulator(1000)
-	defer sim.cancelFunc()
+	defer sim.(*schedSim).cancelFunc() // inorder to stop InformerFactory and scheduler
 
-	podClient := sim.Client.CoreV1().Pods(DefaultNamespace)
-	podInformer := sim.InformerFactory.Core().V1().Pods().Informer()
+	podClient := sim.GetKubernetesClient().CoreV1().Pods(DefaultNamespace)
+	podInformer := sim.GetInformerFactory().Core().V1().Pods().Informer()
 	ch := make(chan bool)
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -374,7 +374,7 @@ func TestPodClient(t *testing.T) {
 func TestDeploy10Tick(t *testing.T) {
 	simulator := NewSchedulerSimulator(200)
 	node := BuildNode("node-1", "10", "2G", "5000", FairScheduler)
-	_, err := simulator.Client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+	_, err := simulator.GetKubernetesClient().CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 	if err != nil {
 		panic(err)
 	}
@@ -390,7 +390,7 @@ func TestDeployMultiplePods(t *testing.T) {
 	logrus.SetLevel(logrus.InfoLevel)
 	sim := NewSchedulerSimulator(300)
 	node := BuildNode("node-1", "10", "100G", "1000", FairScheduler)
-	_, err := sim.Client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+	_, err := sim.GetKubernetesClient().CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 	if err != nil {
 		panic(err)
 	}
@@ -406,7 +406,7 @@ func TestDeployPodExceedLimit(t *testing.T) {
 	logrus.SetLevel(logrus.InfoLevel)
 	sim := NewSchedulerSimulator(1000)
 	node := BuildNode("node-1", "10", "100G", "10", FairScheduler)
-	_, err := sim.Client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+	_, err := sim.GetKubernetesClient().CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 	if err != nil {
 		panic(err)
 	}
@@ -420,13 +420,13 @@ func TestDeployPodExceedLimit(t *testing.T) {
 
 type deploy10TimesController struct {
 	phase int
-	sim   *SchedSim
+	sim   SchedulerSimulator
 }
 
 func (m *deploy10TimesController) Tick() {
 	if m.phase < 10 {
 		pod := newFakePod(fmt.Sprintf("pod-%d", m.phase))
-		_, err := m.sim.Client.CoreV1().Pods(DefaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+		_, err := m.sim.GetKubernetesClient().CoreV1().Pods(DefaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			panic(err)
 		}
@@ -438,14 +438,14 @@ func (m *deploy10TimesController) Tick() {
 }
 
 type deployMultiplePodsController struct {
-	sim    *SchedSim
+	sim    SchedulerSimulator
 	podNum int
 }
 
 func (d *deployMultiplePodsController) Tick() {
 	for i := 0; i < d.podNum; i++ {
 		pod := newFakePod(fmt.Sprintf("pod-%d", i))
-		_, err := d.sim.Client.CoreV1().Pods(DefaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+		_, err := d.sim.GetKubernetesClient().CoreV1().Pods(DefaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			panic(err)
 		}

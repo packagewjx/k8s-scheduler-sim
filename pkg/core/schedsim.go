@@ -20,7 +20,23 @@ import (
 
 const DefaultNamespace = ""
 
-type SchedSim struct {
+type SchedulerSimulator interface {
+	GetKubernetesClient() kubernetes.Interface
+
+	GetInformerFactory() k8sinformers.SharedInformerFactory
+
+	Run()
+
+	RegisterBeforeUpdateController(controller Controller)
+
+	RegisterAfterUpdateController(controller Controller)
+
+	DeleteBeforeController(controller Controller)
+
+	DeleteAfterController(controller Controller)
+}
+
+type schedSim struct {
 	Client                kubernetes.Interface
 	Nodes                 cache.Store
 	DeploymentControllers cache.Store
@@ -44,6 +60,16 @@ type SchedSim struct {
 	// 用于控制调度器调度添加速率的两个通道
 	addCount  int
 	bindPodCh chan string
+}
+
+var _ SchedulerSimulator = &schedSim{}
+
+func (sim *schedSim) GetInformerFactory() k8sinformers.SharedInformerFactory {
+	return sim.InformerFactory
+}
+
+func (sim *schedSim) GetKubernetesClient() kubernetes.Interface {
+	return sim.Client
 }
 
 var (
@@ -83,9 +109,9 @@ func init() {
 }
 
 // NewSchedulerSimulator 创建一个新的集群。totalTick为模拟集群的总运行周期。
-func NewSchedulerSimulator(totalTick int) *SchedSim {
+func NewSchedulerSimulator(totalTick int) SchedulerSimulator {
 	rootCtx, cancel := context.WithCancel(context.Background())
-	sim := &SchedSim{
+	sim := &schedSim{
 		Client:                nil,
 		Nodes:                 cache.NewStore(NodeKeyFunc),
 		DeploymentControllers: nil,
@@ -124,7 +150,7 @@ func buildScheduler(ctx context.Context, factory k8sinformers.SharedInformerFact
 	return scheduler.New(client, factory, podInformer, mock.SimRecorderFactory, ctx.Done())
 }
 
-func (sim *SchedSim) Run() {
+func (sim *schedSim) Run() {
 	defer sim.cancelFunc()
 
 	nodeMetrics := make(map[*Node]metrics.Aggregator)
@@ -201,23 +227,23 @@ var (
 	afterUpdate  = controllerTiming(2)
 )
 
-func (sim *SchedSim) RegisterBeforeUpdateController(controller Controller) {
+func (sim *schedSim) RegisterBeforeUpdateController(controller Controller) {
 	sim.registerController(controller, beforeUpdate)
 }
 
-func (sim *SchedSim) RegisterAfterUpdateController(controller Controller) {
+func (sim *schedSim) RegisterAfterUpdateController(controller Controller) {
 	sim.registerController(controller, afterUpdate)
 }
 
-func (sim *SchedSim) DeleteBeforeController(controller Controller) {
+func (sim *schedSim) DeleteBeforeController(controller Controller) {
 	sim.deleteController(controller, beforeUpdate)
 }
 
-func (sim *SchedSim) DeleteAfterController(controller Controller) {
+func (sim *schedSim) DeleteAfterController(controller Controller) {
 	sim.deleteController(controller, afterUpdate)
 }
 
-func (sim *SchedSim) registerController(controller Controller, timing controllerTiming) {
+func (sim *schedSim) registerController(controller Controller, timing controllerTiming) {
 	switch timing {
 	case beforeUpdate:
 		sim.beforeUpdate = append(sim.beforeUpdate, controller)
@@ -226,7 +252,7 @@ func (sim *SchedSim) registerController(controller Controller, timing controller
 	}
 }
 
-func (sim *SchedSim) deleteController(controller Controller, timing controllerTiming) {
+func (sim *schedSim) deleteController(controller Controller, timing controllerTiming) {
 	var arr *[]Controller
 	switch timing {
 	case beforeUpdate:
@@ -247,18 +273,18 @@ func (sim *SchedSim) deleteController(controller Controller, timing controllerTi
 	}
 }
 
-// PodAdded 通知创建了新的Pod。注意，本函数应该运行在与SchedSim不同的Goroutine中，否则会永久阻塞。‘
+// podAdded 通知创建了新的Pod。注意，本函数应该运行在与SchedSim不同的Goroutine中，否则会永久阻塞。‘
 // 由于通道无法保证完全的同步，因此使用本方法同步的通知
-func (sim *SchedSim) PodAdded(podName string) {
+func (sim *schedSim) podAdded(podName string) {
 	sim.addCount++
 }
 
-// PodScheduledSuccess 通知调度成功。注意，本函数应该运行在与SchedSim不同的Goroutine中，否则会永久阻塞。
-func (sim *SchedSim) PodScheduledSuccess(podName string) {
+// podScheduledSuccess 通知调度成功。注意，本函数应该运行在与SchedSim不同的Goroutine中，否则会永久阻塞。
+func (sim *schedSim) podScheduledSuccess(podName string) {
 	sim.bindPodCh <- "T" + podName
 }
 
-// PodScheduledFailed 通知调度失败。注意，本函数应该运行在与SchedSim不同的Goroutine中，否则会永久阻塞。
-func (sim *SchedSim) PodScheduledFailed(podName string) {
+// podScheduledFailed 通知调度失败。注意，本函数应该运行在与SchedSim不同的Goroutine中，否则会永久阻塞。
+func (sim *schedSim) podScheduledFailed(podName string) {
 	sim.bindPodCh <- "F" + podName
 }

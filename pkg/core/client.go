@@ -66,7 +66,7 @@ var (
 	TopicPriorityClass = "priorityclass"
 )
 
-func NewClient(sim *SchedSim) (kubernetes.Interface, error) {
+func NewClient(sim *schedSim) (kubernetes.Interface, error) {
 	// New Topics here
 	topics := []string{TopicNode, TopicPod, TopicPriorityClass}
 
@@ -82,7 +82,7 @@ func NewClient(sim *SchedSim) (kubernetes.Interface, error) {
 // For Kubernetes scheduler use only. ONLY implements those used by scheduler.
 // All options are ignored, for simplicity.
 type simClient struct {
-	sim *SchedSim
+	sim *schedSim
 }
 
 func (client *simClient) RESTClient() rest.Interface {
@@ -319,7 +319,7 @@ func (client *simClient) StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interf
 
 // coreV1Client 实现k8s.io/client-go/kubernetes/typed/core/v1.Interface
 type coreV1Client struct {
-	sim *SchedSim
+	sim *schedSim
 }
 
 func (client *coreV1Client) RESTClient() rest.Interface {
@@ -392,7 +392,7 @@ func (client *coreV1Client) ServiceAccounts(_ string) corev1.ServiceAccountInter
 
 // coreV1NodeClient 实现corev1.NodeInterface
 type coreV1NodeClient struct {
-	sim *SchedSim
+	sim *schedSim
 }
 
 func (client *coreV1NodeClient) Create(_ context.Context, node *apicorev1.Node, _ apimachineryv1.CreateOptions) (*apicorev1.Node, error) {
@@ -577,7 +577,7 @@ func (client *coreV1NodeClient) PatchStatus(_ context.Context, _ string, _ []byt
 }
 
 type coreV1PodClient struct {
-	sim *SchedSim
+	sim *schedSim
 }
 
 func (c *coreV1PodClient) Create(_ context.Context, pod *apicorev1.Pod, _ apimachineryv1.CreateOptions) (*apicorev1.Pod, error) {
@@ -643,7 +643,7 @@ func (c *coreV1PodClient) Create(_ context.Context, pod *apicorev1.Pod, _ apimac
 	}
 
 	// 通知SchedSim已经加了新的Pod
-	c.sim.PodAdded(pod.Name)
+	c.sim.podAdded(pod.Name)
 
 	return pod, nil
 }
@@ -707,7 +707,7 @@ func (c *coreV1PodClient) UpdateStatus(_ context.Context, pod *apicorev1.Pod, _ 
 	for _, condition := range pod.Status.Conditions {
 		if condition.Reason == apicorev1.PodReasonUnschedulable {
 			// 通知调度失败
-			c.sim.PodScheduledFailed(pod.Name)
+			c.sim.podScheduledFailed(pod.Name)
 			break
 		}
 	}
@@ -817,7 +817,7 @@ func (c *coreV1PodClient) Bind(_ context.Context, binding *apicorev1.Binding, _ 
 		return errors.Wrap(err, "bind error")
 	}
 
-	c.sim.PodScheduledSuccess(pod.Name)
+	c.sim.podScheduledSuccess(pod.Name)
 
 	return nil
 }
@@ -833,7 +833,7 @@ func (c *coreV1PodClient) GetLogs(_ string, _ *apicorev1.PodLogOptions) *rest.Re
 }
 
 type schedulingV1Client struct {
-	sim *SchedSim
+	sim *schedSim
 }
 
 func (s *schedulingV1Client) Create(class *apischedulingv1.PriorityClass) (*apischedulingv1.PriorityClass, error) {

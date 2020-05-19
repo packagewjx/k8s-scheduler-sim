@@ -48,17 +48,18 @@ func (p *priorityQueue) Pop() interface{} {
 	return item
 }
 
-func NewControllerDeployer() ControllerDeployer {
+func NewControllerDeployer(sim core.SchedulerSimulator) ControllerDeployer {
 	timers := priorityQueue(make([]*controllerTimer, 0, 10))
 	heap.Init(&timers)
 	return &controllerDeployer{
 		tick:  0,
 		queue: &timers,
+		sim:   sim,
 	}
 }
 
 type controllerDeployer struct {
-	sim   *core.SchedSim
+	sim   core.SchedulerSimulator
 	tick  int
 	queue *priorityQueue
 }

@@ -72,7 +72,6 @@ func BuildPod(name string, cpuLimit float64, memLimit int, algorithm string, dep
 	}, nil
 }
 
-// TODO 将内存值改为int64
 type PodAlgorithm interface {
 	// 返回当前一个时钟滴答内的使用率。
 	// slot 为Pod分配到的时间片的大小的数组，每个值取值0～1，数组长度代表分配到的CPU数量。在负载一定的情况下，
@@ -80,13 +79,13 @@ type PodAlgorithm interface {
 	// mem Pod分配到的内存的大小，为实际的大小。Pod不能使用超过此值的内存，否则最多分配此值。
 	// Load 代表单位时间内的负载压力指示，取值0～1。是使用了时间片的比值，1代表使用了所有的时间片。
 	// MemUsage 实际占用的内存大小，不能超过mem
-	Tick(slot []float64, mem int) (Load float64, MemUsage int)
+	Tick(slot []float64, mem int64) (Load float64, MemUsage int64)
 
 	// ResourceRequest 返回本Pod在下一个周期所需要使用的CPU数和内存数。
 	// cpu 节点CPU数量。注意不能超过本Pod的限制。
 	// mem 节点空闲内存数量。这部分内存尚未使用，而另一部分内存则被Pod占用。Pod可以选择提高Mem，也可以降低Mem使用。
 	//     不能超过本Pod的限制。
-	ResourceRequest() (cpu float64, mem int)
+	ResourceRequest() (cpu float64, mem int64)
 }
 
 type PodAlgorithmFactory func(argJson string, pod *Pod) (PodAlgorithm, error)
@@ -150,11 +149,11 @@ const testPod = "test"
 type testPodAlgorithm struct {
 }
 
-func (t *testPodAlgorithm) Tick(slot []float64, mem int) (Load float64, MemUsage int) {
+func (t *testPodAlgorithm) Tick(_ []float64, _ int64) (Load float64, MemUsage int64) {
 	return 1, 1
 }
 
-func (t *testPodAlgorithm) ResourceRequest() (cpu float64, mem int) {
+func (t *testPodAlgorithm) ResourceRequest() (cpu float64, mem int64) {
 	return 1, 1
 }
 

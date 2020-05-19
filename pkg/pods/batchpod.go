@@ -10,12 +10,12 @@ import (
 // batchPodAlgorithm 模拟批处理任务的Pod，默认一直在跑任务，因此负载一直为1，内存使用基本固定
 type batchPodAlgorithm struct {
 	Pod       *core.Pod
-	MemUsage  int
+	MemUsage  int64
 	TotalTick float64
 }
 
 type BatchPodState struct {
-	MemUsage  int     `json:"memUsage"`
+	MemUsage  int64   `json:"memUsage"`
 	TotalTick float64 `json:"totalTick"`
 }
 
@@ -37,11 +37,11 @@ var BatchPodFactory core.PodAlgorithmFactory = func(stateJson string, pod *core.
 	}, nil
 }
 
-func (alg *batchPodAlgorithm) ResourceRequest() (cpu float64, mem int) {
+func (alg *batchPodAlgorithm) ResourceRequest() (cpu float64, mem int64) {
 	return alg.Pod.CpuLimit, alg.MemUsage
 }
 
-func (alg *batchPodAlgorithm) Tick(slot []float64, mem int) (Load float64, MemUsage int) {
+func (alg *batchPodAlgorithm) Tick(slot []float64, mem int64) (Load float64, MemUsage int64) {
 	if alg.TotalTick < 0 {
 		alg.Pod.Status.Phase = v1.PodSucceeded
 		return 0, 0

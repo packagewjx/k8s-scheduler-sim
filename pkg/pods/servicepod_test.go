@@ -29,7 +29,7 @@ func TestServicePod(t *testing.T) {
 	if load > 0.5 {
 		t.Error("load should be 0.5")
 	}
-	if memUsage != int(baseMem) {
+	if memUsage != baseMem {
 		t.Error("should be baseMem")
 	}
 
@@ -167,7 +167,7 @@ func TestSingleCPU(t *testing.T) {
 			if !floatEquals(load, testCase.tickLoad[tick]) {
 				t.Errorf("load should be %f not %f", testCase.tickLoad[tick], load)
 			}
-			if int64(mem) != testCase.tickMem[tick] {
+			if mem != testCase.tickMem[tick] {
 				t.Errorf("mem should be %d not %d", testCase.tickMem[tick], mem)
 			}
 		}

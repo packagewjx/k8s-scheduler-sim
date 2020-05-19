@@ -9,11 +9,11 @@ import (
 type mockAlgorithm struct {
 }
 
-func (_ *mockAlgorithm) ResourceRequest() (cpu float64, mem int) {
+func (_ *mockAlgorithm) ResourceRequest() (cpu float64, mem int64) {
 	return 1, 1
 }
 
-func (_ *mockAlgorithm) Tick(slot []float64, mem int) (Load float64, MemUsage int) {
+func (_ *mockAlgorithm) Tick(_ []float64, _ int64) (Load float64, MemUsage int64) {
 	return 1, 100
 }
 

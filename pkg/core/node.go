@@ -93,9 +93,9 @@ func (n *Node) Tick(client kubernetes.Interface) *metrics.TickMetrics {
 	terminatedPods := make([]*Pod, 0)
 	type PodResource struct {
 		slot     []float64
-		mem      int
+		mem      int64
 		load     float64
-		memUsage int
+		memUsage int64
 	}
 
 	readyPods := make([]*Pod, 0, len(n.Pods))
@@ -151,7 +151,7 @@ func (n *Node) Tick(client kubernetes.Interface) *metrics.TickMetrics {
 
 	// 根据分配结果更新Pod的执行状态
 	logrus.Debugf("Node %s Updating Pod status", n.Name)
-	memUsed := 0
+	memUsed := int64(0)
 	load := float64(0)
 	for i := 0; i < len(readyPods); i++ {
 		logrus.Tracef("Node %s Updating Pod %s status", n.Name, readyPods[i].Name)

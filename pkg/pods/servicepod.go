@@ -156,15 +156,15 @@ func (f *freeCpuList) Pop() interface{} {
 	return ret
 }
 
-func (p *simServicePod) Tick(slot []float64, mem int) (Load float64, MemUsage int) {
+func (p *simServicePod) Tick(slot []float64, mem int64) (Load float64, MemUsage int64) {
 	if !p.initialized {
 		// 初始化返回
 		p.lastUsedMem = p.baseMem
-		p.lastAvailableMem = int64(mem)
+		p.lastAvailableMem = mem
 		p.lastLoad = 0.5
 		p.lastMemUsage = float64(p.baseMem) / float64(mem)
 		p.initialized = true
-		return 0.5, int(p.baseMem)
+		return 0.5, p.baseMem
 	}
 
 	// 计算所需总内存
@@ -175,7 +175,7 @@ func (p *simServicePod) Tick(slot []float64, mem int) (Load float64, MemUsage in
 	}
 
 	// 内存过少时惩罚性增加处理时间
-	slotMultiplier := memoryShortagePenalty(int64(mem), int64(serviceContextStoreRatio*float64(mem)))
+	slotMultiplier := memoryShortagePenalty(mem, int64(serviceContextStoreRatio*float64(mem)))
 
 	freeList := &freeCpuList{list: make([]*freeCpu, 0, len(slot))}
 	// 记录每个CPU处理单个服务的内存最大值
@@ -242,12 +242,12 @@ func (p *simServicePod) Tick(slot []float64, mem int) (Load float64, MemUsage in
 	}
 	// 计算内存使用
 	for i := 0; i < len(maxMemUsed); i++ {
-		MemUsage += int(maxMemUsed[i])
+		MemUsage += maxMemUsed[i]
 	}
 	for cur := p.queue.Front(); cur != nil; cur = cur.Next() {
-		MemUsage += int(serviceContextStoreRatio * float64(cur.Value.(*ServiceContext).MemRequired))
+		MemUsage += int64(serviceContextStoreRatio * float64(cur.Value.(*ServiceContext).MemRequired))
 	}
-	MemUsage += int(p.baseMem)
+	MemUsage += p.baseMem
 	if MemUsage > mem {
 		// 可以理解为超出的内存存储在了硬盘
 		MemUsage = mem
@@ -257,23 +257,23 @@ func (p *simServicePod) Tick(slot []float64, mem int) (Load float64, MemUsage in
 	// 更新缓存
 	p.lastMemUsage = float64(MemUsage) / float64(mem)
 	p.lastLoad = Load
-	p.lastAvailableMem = int64(mem)
-	p.lastUsedMem = int64(MemUsage)
+	p.lastAvailableMem = mem
+	p.lastUsedMem = MemUsage
 
 	return
 }
 
-func (p *simServicePod) ResourceRequest() (cpu float64, mem int) {
+func (p *simServicePod) ResourceRequest() (cpu float64, mem int64) {
 	for cur := p.queue.Front(); cur != nil; cur = cur.Next() {
 		ctx := cur.Value.(*ServiceContext)
-		mem += int(ctx.MemRequired)
+		mem += ctx.MemRequired
 		cpu += ctx.SlotRequired
 	}
-	mem += int(p.baseMem)
+	mem += p.baseMem
 	return
 }
 
-// memoryShortagePenalty 计算若内存不足时，导致的时间增加的惩罚。可以理解为，物理内存不足，导致部分内存需要存放到硬盘中，
+// memoryShortagePenalty 计算若物理内存不足时，导致的时间增加的惩罚。可以理解为，物理内存不足，导致部分内存需要存放到硬盘中，
 // 从而导致Page Miss，产生额外的开销。这个开销表现为时间片的增加
 func memoryShortagePenalty(memAvailable, memNeeded int64) float64 {
 	if memNeeded <= memAvailable {

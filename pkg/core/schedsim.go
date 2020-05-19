@@ -201,16 +201,12 @@ var (
 	afterUpdate  = controllerTiming(2)
 )
 
-func (sim *SchedSim) RegisterBeforeUpdateController(factory ControllerFactory) Controller {
-	controller := factory(sim)
+func (sim *SchedSim) RegisterBeforeUpdateController(controller Controller) {
 	sim.registerController(controller, beforeUpdate)
-	return controller
 }
 
-func (sim *SchedSim) RegisterAfterUpdateController(factory ControllerFactory) Controller {
-	controller := factory(sim)
+func (sim *SchedSim) RegisterAfterUpdateController(controller Controller) {
 	sim.registerController(controller, afterUpdate)
-	return controller
 }
 
 func (sim *SchedSim) DeleteBeforeController(controller Controller) {

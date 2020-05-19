@@ -1,21 +1,22 @@
-package core
+package controllers
 
-func NewReplicationController(replicaNum int) ControllerFactory {
-	return func(sim *SchedSim) Controller {
-		return &replicationController{
-			replicaNum: replicaNum,
-		}
+import "github.com/packagewjx/k8s-scheduler-sim/pkg/core"
+
+func NewReplicationController(sim *core.SchedSim, replicaNum int) ReplicationController {
+	return &replicationController{
+		sim:        sim,
+		replicaNum: replicaNum,
 	}
 }
 
 type ReplicationController interface {
-	Controller
+	core.Controller
 	SetReplicaNum(num int)
 	Terminate()
 }
 
 type replicationController struct {
-	sim        *SchedSim
+	sim        *core.SchedSim
 	replicaNum int
 }
 

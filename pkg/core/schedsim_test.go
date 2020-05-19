@@ -378,10 +378,9 @@ func TestDeploy10Tick(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	simulator.RegisterBeforeUpdateController(func(sim *SchedSim) Controller {
-		return &deploy10TimesController{
-			sim: sim,
-		}
+	simulator.RegisterBeforeUpdateController(&deploy10TimesController{
+		phase: 0,
+		sim:   simulator,
 	})
 
 	simulator.Run()
@@ -395,11 +394,9 @@ func TestDeployMultiplePods(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	sim.RegisterBeforeUpdateController(func(sim *SchedSim) Controller {
-		return &deployMultiplePodsController{
-			sim:    sim,
-			podNum: 100,
-		}
+	sim.RegisterBeforeUpdateController(&deployMultiplePodsController{
+		sim:    sim,
+		podNum: 1000,
 	})
 
 	sim.Run()
@@ -413,11 +410,9 @@ func TestDeployPodExceedLimit(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	sim.RegisterBeforeUpdateController(func(sim *SchedSim) Controller {
-		return &deployMultiplePodsController{
-			sim:    sim,
-			podNum: 100,
-		}
+	sim.RegisterBeforeUpdateController(&deployMultiplePodsController{
+		sim:    sim,
+		podNum: 100,
 	})
 
 	sim.Run()

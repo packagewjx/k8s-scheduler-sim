@@ -121,8 +121,6 @@ type Controller interface {
 	Tick()
 }
 
-type ControllerFactory func(sim *SchedSim) Controller
-
 // DeploymentController 模拟Kubernetes的控制器，根据其配置的模板构建Pod，然后通过Tick方法提交到本集群
 // 用户可以实现本接口，以定制Pod的提交。如批处理任务中某些Pod先于另一些Pod提交，或者在线业务中，压力增大时提交更多的Pod的
 // 逻辑。

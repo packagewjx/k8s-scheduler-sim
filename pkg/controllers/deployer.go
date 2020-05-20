@@ -4,6 +4,7 @@ package controllers
 import (
 	"container/heap"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/core"
+	"github.com/sirupsen/logrus"
 )
 
 // ControllerDeployer deploys controller at given tick. This controller will regard first Tick() call as tick 0. And it
@@ -64,18 +65,20 @@ type controllerDeployer struct {
 	queue *priorityQueue
 }
 
-func (c controllerDeployer) Tick() {
+func (c *controllerDeployer) Tick() {
+	c.tick++
+
 	for c.queue.Len() > 0 && (*c.queue)[0].tick <= c.tick {
 		item := heap.Pop(c.queue)
 		timer := item.(*controllerTimer)
+		logrus.Infof("Deploying controller at tick#%d", c.tick)
+
 		if timer.when == BeforeUpdate {
 			c.sim.RegisterBeforeUpdateController(timer.controller)
 		} else if timer.when == AfterUpdate {
 			c.sim.RegisterAfterUpdateController(timer.controller)
 		}
 	}
-
-	c.tick++
 }
 
 type DeployTime string
@@ -85,7 +88,7 @@ var (
 	AfterUpdate  DeployTime = "a"
 )
 
-func (c controllerDeployer) DeployAt(controller core.Controller, tick int, when DeployTime) {
+func (c *controllerDeployer) DeployAt(controller core.Controller, tick int, when DeployTime) {
 	if tick < c.tick {
 		// ignore this request
 		return

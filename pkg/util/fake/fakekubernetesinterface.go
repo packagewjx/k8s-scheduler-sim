@@ -55,14 +55,9 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-var (
-	fakeTopicPod  = "fakePod"
-	fakeTopicNode = "fakeNode"
-)
-
 func NewFakeKubernetesInterface() kubernetes.Interface {
-	_ = util.GetMessageQueue().NewTopic(fakeTopicNode)
-	_ = util.GetMessageQueue().NewTopic(fakeTopicPod)
+	_ = util.GetMessageQueue().NewTopic(util.TopicPod)
+	_ = util.GetMessageQueue().NewTopic(util.TopicNode)
 	return &fakeKubernetesInterface{}
 }
 
@@ -78,19 +73,19 @@ func (f *fakeKubernetesInterface) ComponentStatuses() deprecatedv1.ComponentStat
 	panic("implement me")
 }
 
-func (f *fakeKubernetesInterface) ConfigMaps(namespace string) deprecatedv1.ConfigMapInterface {
+func (f *fakeKubernetesInterface) ConfigMaps(_ string) deprecatedv1.ConfigMapInterface {
 	panic("implement me")
 }
 
-func (f *fakeKubernetesInterface) Endpoints(namespace string) deprecatedv1.EndpointsInterface {
+func (f *fakeKubernetesInterface) Endpoints(_ string) deprecatedv1.EndpointsInterface {
 	panic("implement me")
 }
 
-func (f *fakeKubernetesInterface) Events(namespace string) deprecatedv1.EventInterface {
+func (f *fakeKubernetesInterface) Events(_ string) deprecatedv1.EventInterface {
 	panic("implement me")
 }
 
-func (f *fakeKubernetesInterface) LimitRanges(namespace string) deprecatedv1.LimitRangeInterface {
+func (f *fakeKubernetesInterface) LimitRanges(_ string) deprecatedv1.LimitRangeInterface {
 	panic("implement me")
 }
 
@@ -106,35 +101,35 @@ func (f *fakeKubernetesInterface) PersistentVolumes() deprecatedv1.PersistentVol
 	panic("implement me")
 }
 
-func (f *fakeKubernetesInterface) PersistentVolumeClaims(namespace string) deprecatedv1.PersistentVolumeClaimInterface {
+func (f *fakeKubernetesInterface) PersistentVolumeClaims(_ string) deprecatedv1.PersistentVolumeClaimInterface {
 	panic("implement me")
 }
 
-func (f *fakeKubernetesInterface) Pods(namespace string) deprecatedv1.PodInterface {
+func (f *fakeKubernetesInterface) Pods(_ string) deprecatedv1.PodInterface {
 	panic("implement me")
 }
 
-func (f *fakeKubernetesInterface) PodTemplates(namespace string) deprecatedv1.PodTemplateInterface {
+func (f *fakeKubernetesInterface) PodTemplates(_ string) deprecatedv1.PodTemplateInterface {
 	panic("implement me")
 }
 
-func (f *fakeKubernetesInterface) ReplicationControllers(namespace string) deprecatedv1.ReplicationControllerInterface {
+func (f *fakeKubernetesInterface) ReplicationControllers(_ string) deprecatedv1.ReplicationControllerInterface {
 	panic("implement me")
 }
 
-func (f *fakeKubernetesInterface) ResourceQuotas(namespace string) deprecatedv1.ResourceQuotaInterface {
+func (f *fakeKubernetesInterface) ResourceQuotas(_ string) deprecatedv1.ResourceQuotaInterface {
 	panic("implement me")
 }
 
-func (f *fakeKubernetesInterface) Secrets(namespace string) deprecatedv1.SecretInterface {
+func (f *fakeKubernetesInterface) Secrets(_ string) deprecatedv1.SecretInterface {
 	panic("implement me")
 }
 
-func (f *fakeKubernetesInterface) Services(namespace string) deprecatedv1.ServiceInterface {
+func (f *fakeKubernetesInterface) Services(_ string) deprecatedv1.ServiceInterface {
 	panic("implement me")
 }
 
-func (f *fakeKubernetesInterface) ServiceAccounts(namespace string) deprecatedv1.ServiceAccountInterface {
+func (f *fakeKubernetesInterface) ServiceAccounts(_ string) deprecatedv1.ServiceAccountInterface {
 	panic("implement me")
 }
 
@@ -313,19 +308,19 @@ func (f *fakeCoreV1Interface) ComponentStatuses() corev1.ComponentStatusInterfac
 	panic("implement me")
 }
 
-func (f *fakeCoreV1Interface) ConfigMaps(namespace string) corev1.ConfigMapInterface {
+func (f *fakeCoreV1Interface) ConfigMaps(_ string) corev1.ConfigMapInterface {
 	panic("implement me")
 }
 
-func (f *fakeCoreV1Interface) Endpoints(namespace string) corev1.EndpointsInterface {
+func (f *fakeCoreV1Interface) Endpoints(_ string) corev1.EndpointsInterface {
 	panic("implement me")
 }
 
-func (f *fakeCoreV1Interface) Events(namespace string) corev1.EventInterface {
+func (f *fakeCoreV1Interface) Events(_ string) corev1.EventInterface {
 	panic("implement me")
 }
 
-func (f *fakeCoreV1Interface) LimitRanges(namespace string) corev1.LimitRangeInterface {
+func (f *fakeCoreV1Interface) LimitRanges(_ string) corev1.LimitRangeInterface {
 	panic("implement me")
 }
 
@@ -341,86 +336,86 @@ func (f *fakeCoreV1Interface) PersistentVolumes() corev1.PersistentVolumeInterfa
 	panic("implement me")
 }
 
-func (f *fakeCoreV1Interface) PersistentVolumeClaims(namespace string) corev1.PersistentVolumeClaimInterface {
+func (f *fakeCoreV1Interface) PersistentVolumeClaims(_ string) corev1.PersistentVolumeClaimInterface {
 	panic("implement me")
 }
 
-func (f *fakeCoreV1Interface) Pods(namespace string) corev1.PodInterface {
+func (f *fakeCoreV1Interface) Pods(_ string) corev1.PodInterface {
 	return &fakePodInterface{}
 }
 
-func (f *fakeCoreV1Interface) PodTemplates(namespace string) corev1.PodTemplateInterface {
+func (f *fakeCoreV1Interface) PodTemplates(_ string) corev1.PodTemplateInterface {
 	panic("implement me")
 }
 
-func (f *fakeCoreV1Interface) ReplicationControllers(namespace string) corev1.ReplicationControllerInterface {
+func (f *fakeCoreV1Interface) ReplicationControllers(_ string) corev1.ReplicationControllerInterface {
 	panic("implement me")
 }
 
-func (f *fakeCoreV1Interface) ResourceQuotas(namespace string) corev1.ResourceQuotaInterface {
+func (f *fakeCoreV1Interface) ResourceQuotas(_ string) corev1.ResourceQuotaInterface {
 	panic("implement me")
 }
 
-func (f *fakeCoreV1Interface) Secrets(namespace string) corev1.SecretInterface {
+func (f *fakeCoreV1Interface) Secrets(_ string) corev1.SecretInterface {
 	panic("implement me")
 }
 
-func (f *fakeCoreV1Interface) Services(namespace string) corev1.ServiceInterface {
+func (f *fakeCoreV1Interface) Services(_ string) corev1.ServiceInterface {
 	panic("implement me")
 }
 
-func (f *fakeCoreV1Interface) ServiceAccounts(namespace string) corev1.ServiceAccountInterface {
+func (f *fakeCoreV1Interface) ServiceAccounts(_ string) corev1.ServiceAccountInterface {
 	panic("implement me")
 }
 
 type fakeNodeInterface struct {
 }
 
-func (f *fakeNodeInterface) Create(ctx context.Context, node *v1.Node, opts apimachineryv1.CreateOptions) (*v1.Node, error) {
+func (f *fakeNodeInterface) Create(_ context.Context, node *v1.Node, _ apimachineryv1.CreateOptions) (*v1.Node, error) {
 	addEvent := &watch.Event{
 		Type:   watch.Added,
 		Object: node,
 	}
-	_ = util.GetMessageQueue().Publish(fakeTopicNode, addEvent)
+	_ = util.GetMessageQueue().Publish(util.TopicNode, addEvent)
 	return node, nil
 }
 
-func (f *fakeNodeInterface) Update(ctx context.Context, node *v1.Node, opts apimachineryv1.UpdateOptions) (*v1.Node, error) {
+func (f *fakeNodeInterface) Update(_ context.Context, node *v1.Node, _ apimachineryv1.UpdateOptions) (*v1.Node, error) {
 	updateEvent := &watch.Event{
 		Type:   watch.Modified,
 		Object: node,
 	}
-	_ = util.GetMessageQueue().Publish(fakeTopicNode, updateEvent)
+	_ = util.GetMessageQueue().Publish(util.TopicNode, updateEvent)
 	return node, nil
 }
 
-func (f *fakeNodeInterface) UpdateStatus(ctx context.Context, node *v1.Node, opts apimachineryv1.UpdateOptions) (*v1.Node, error) {
+func (f *fakeNodeInterface) UpdateStatus(_ context.Context, node *v1.Node, _ apimachineryv1.UpdateOptions) (*v1.Node, error) {
 	updateEvent := &watch.Event{
 		Type:   watch.Modified,
 		Object: node,
 	}
-	_ = util.GetMessageQueue().Publish(fakeTopicNode, updateEvent)
+	_ = util.GetMessageQueue().Publish(util.TopicNode, updateEvent)
 	return node, nil
 }
 
-func (f *fakeNodeInterface) Delete(ctx context.Context, name string, opts apimachineryv1.DeleteOptions) error {
+func (f *fakeNodeInterface) Delete(_ context.Context, _ string, _ apimachineryv1.DeleteOptions) error {
 	deleteEvent := &watch.Event{
 		Type:   watch.Deleted,
 		Object: &v1.Node{},
 	}
-	_ = util.GetMessageQueue().Publish(fakeTopicNode, deleteEvent)
+	_ = util.GetMessageQueue().Publish(util.TopicNode, deleteEvent)
 	return nil
 }
 
-func (f *fakeNodeInterface) DeleteCollection(ctx context.Context, opts apimachineryv1.DeleteOptions, listOpts apimachineryv1.ListOptions) error {
+func (f *fakeNodeInterface) DeleteCollection(_ context.Context, _ apimachineryv1.DeleteOptions, _ apimachineryv1.ListOptions) error {
 	panic("implement me")
 }
 
-func (f *fakeNodeInterface) Get(ctx context.Context, name string, opts apimachineryv1.GetOptions) (*v1.Node, error) {
+func (f *fakeNodeInterface) Get(_ context.Context, _ string, _ apimachineryv1.GetOptions) (*v1.Node, error) {
 	return &v1.Node{}, nil
 }
 
-func (f *fakeNodeInterface) List(ctx context.Context, opts apimachineryv1.ListOptions) (*v1.NodeList, error) {
+func (f *fakeNodeInterface) List(_ context.Context, _ apimachineryv1.ListOptions) (*v1.NodeList, error) {
 	nodes := []v1.Node{{}}
 	list := &v1.NodeList{
 		TypeMeta: apimachineryv1.TypeMeta{},
@@ -430,36 +425,36 @@ func (f *fakeNodeInterface) List(ctx context.Context, opts apimachineryv1.ListOp
 	return list, nil
 }
 
-func (f *fakeNodeInterface) Watch(ctx context.Context, opts apimachineryv1.ListOptions) (watch.Interface, error) {
-	return util.GetMessageQueue().Subscribe(fakeTopicNode)
+func (f *fakeNodeInterface) Watch(_ context.Context, _ apimachineryv1.ListOptions) (watch.Interface, error) {
+	return util.GetMessageQueue().Subscribe(util.TopicNode)
 }
 
-func (f *fakeNodeInterface) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts apimachineryv1.PatchOptions, subresources ...string) (result *v1.Node, err error) {
+func (f *fakeNodeInterface) Patch(_ context.Context, _ string, _ types.PatchType, _ []byte, _ apimachineryv1.PatchOptions, _ ...string) (result *v1.Node, err error) {
 	panic("implement me")
 }
 
-func (f *fakeNodeInterface) PatchStatus(ctx context.Context, nodeName string, data []byte) (*v1.Node, error) {
+func (f *fakeNodeInterface) PatchStatus(_ context.Context, _ string, _ []byte) (*v1.Node, error) {
 	panic("implement me")
 }
 
 type fakePodInterface struct {
 }
 
-func (f *fakePodInterface) Create(ctx context.Context, pod *v1.Pod, _ apimachineryv1.CreateOptions) (*v1.Pod, error) {
+func (f *fakePodInterface) Create(_ context.Context, pod *v1.Pod, _ apimachineryv1.CreateOptions) (*v1.Pod, error) {
 	ev := &watch.Event{
 		Type:   watch.Added,
 		Object: pod,
 	}
-	_ = util.GetMessageQueue().Publish(fakeTopicPod, ev)
+	_ = util.GetMessageQueue().Publish(util.TopicPod, ev)
 	return pod, nil
 }
 
-func (f *fakePodInterface) Update(ctx context.Context, pod *v1.Pod, opts apimachineryv1.UpdateOptions) (*v1.Pod, error) {
+func (f *fakePodInterface) Update(_ context.Context, pod *v1.Pod, _ apimachineryv1.UpdateOptions) (*v1.Pod, error) {
 	ev := &watch.Event{
 		Type:   watch.Modified,
 		Object: pod,
 	}
-	_ = util.GetMessageQueue().Publish(fakeTopicPod, ev)
+	_ = util.GetMessageQueue().Publish(util.TopicPod, ev)
 	return pod, nil
 }
 
@@ -467,7 +462,7 @@ func (f *fakePodInterface) UpdateStatus(ctx context.Context, pod *v1.Pod, opts a
 	return f.Update(ctx, pod, opts)
 }
 
-func (f *fakePodInterface) Delete(ctx context.Context, name string, opts apimachineryv1.DeleteOptions) error {
+func (f *fakePodInterface) Delete(_ context.Context, name string, _ apimachineryv1.DeleteOptions) error {
 	ev := &watch.Event{
 		Type: watch.Deleted,
 		Object: &v1.Pod{
@@ -476,46 +471,46 @@ func (f *fakePodInterface) Delete(ctx context.Context, name string, opts apimach
 			},
 		},
 	}
-	_ = util.GetMessageQueue().Publish(fakeTopicPod, ev)
+	_ = util.GetMessageQueue().Publish(util.TopicPod, ev)
 	return nil
 }
 
-func (f *fakePodInterface) DeleteCollection(ctx context.Context, opts apimachineryv1.DeleteOptions, listOpts apimachineryv1.ListOptions) error {
+func (f *fakePodInterface) DeleteCollection(_ context.Context, _ apimachineryv1.DeleteOptions, _ apimachineryv1.ListOptions) error {
 	panic("implement me")
 }
 
-func (f *fakePodInterface) Get(ctx context.Context, name string, opts apimachineryv1.GetOptions) (*v1.Pod, error) {
+func (f *fakePodInterface) Get(_ context.Context, _ string, _ apimachineryv1.GetOptions) (*v1.Pod, error) {
 	panic("implement me")
 }
 
-func (f *fakePodInterface) List(ctx context.Context, opts apimachineryv1.ListOptions) (*v1.PodList, error) {
+func (f *fakePodInterface) List(_ context.Context, _ apimachineryv1.ListOptions) (*v1.PodList, error) {
 	panic("implement me")
 }
 
-func (f *fakePodInterface) Watch(ctx context.Context, opts apimachineryv1.ListOptions) (watch.Interface, error) {
-	return util.GetMessageQueue().Subscribe(fakeTopicPod)
+func (f *fakePodInterface) Watch(_ context.Context, _ apimachineryv1.ListOptions) (watch.Interface, error) {
+	return util.GetMessageQueue().Subscribe(util.TopicPod)
 }
 
-func (f *fakePodInterface) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts apimachineryv1.PatchOptions, subresources ...string) (result *v1.Pod, err error) {
+func (f *fakePodInterface) Patch(_ context.Context, _ string, _ types.PatchType, _ []byte, _ apimachineryv1.PatchOptions, _ ...string) (result *v1.Pod, err error) {
 	panic("implement me")
 }
 
-func (f *fakePodInterface) GetEphemeralContainers(ctx context.Context, podName string, options apimachineryv1.GetOptions) (*v1.EphemeralContainers, error) {
+func (f *fakePodInterface) GetEphemeralContainers(_ context.Context, _ string, _ apimachineryv1.GetOptions) (*v1.EphemeralContainers, error) {
 	panic("implement me")
 }
 
-func (f *fakePodInterface) UpdateEphemeralContainers(ctx context.Context, podName string, ephemeralContainers *v1.EphemeralContainers, opts apimachineryv1.UpdateOptions) (*v1.EphemeralContainers, error) {
+func (f *fakePodInterface) UpdateEphemeralContainers(_ context.Context, _ string, _ *v1.EphemeralContainers, _ apimachineryv1.UpdateOptions) (*v1.EphemeralContainers, error) {
 	panic("implement me")
 }
 
-func (f *fakePodInterface) Bind(ctx context.Context, binding *v1.Binding, opts apimachineryv1.CreateOptions) error {
+func (f *fakePodInterface) Bind(_ context.Context, _ *v1.Binding, _ apimachineryv1.CreateOptions) error {
 	panic("implement me")
 }
 
-func (f *fakePodInterface) Evict(ctx context.Context, eviction *v1beta1.Eviction) error {
+func (f *fakePodInterface) Evict(_ context.Context, _ *v1beta1.Eviction) error {
 	panic("implement me")
 }
 
-func (f *fakePodInterface) GetLogs(name string, opts *v1.PodLogOptions) *rest.Request {
+func (f *fakePodInterface) GetLogs(_ string, _ *v1.PodLogOptions) *rest.Request {
 	panic("implement me")
 }

@@ -8,11 +8,19 @@ import (
 
 const messageQueueSize = 16
 
+const (
+	TopicNode          = "node"
+	TopicPod           = "pod"
+	TopicPriorityClass = "priorityClass"
+)
+
 type MessageQueue interface {
 	// NewTopic 创建一个新的沟通话题，让订阅者和发布者进行沟通
 	NewTopic(topic string) error
 
 	Subscribe(topic string) (watch.Interface, error)
+
+	SubscribeSynchronously(topic string, handler func(event *watch.Event)) error
 
 	Publish(topic string, event *watch.Event) error
 
@@ -52,14 +60,23 @@ func (w *watcher) ResultChan() <-chan watch.Event {
 // 发送消息到所有监听器后返回。
 func NewSynchronizedMessageQueue() MessageQueue {
 	return &synchronizedMessageQueue{
-		listeners: make(map[string][]chan watch.Event),
-		lock:      sync.RWMutex{},
+		listeners:     make(map[string][]chan watch.Event),
+		syncListeners: make(map[string][]func(event *watch.Event)),
+		lock:          sync.RWMutex{},
 	}
 }
 
 type synchronizedMessageQueue struct {
-	listeners map[string][]chan watch.Event
-	lock      sync.RWMutex
+	listeners     map[string][]chan watch.Event
+	syncListeners map[string][]func(event *watch.Event)
+	lock          sync.RWMutex
+}
+
+func (queue *synchronizedMessageQueue) SubscribeSynchronously(topic string, handler func(event *watch.Event)) error {
+	queue.lock.Lock()
+	defer queue.lock.Unlock()
+	queue.syncListeners[topic] = append(queue.syncListeners[topic], handler)
+	return nil
 }
 
 func (queue *synchronizedMessageQueue) NewTopic(topic string) error {
@@ -90,6 +107,11 @@ func (queue *synchronizedMessageQueue) Publish(topic string, event *watch.Event)
 	for _, listener := range queue.listeners[topic] {
 		logrus.Tracef("MessageQueue: Notifying topic %s subscriber %p", topic, &listener)
 		listener <- *event
+	}
+
+	for _, listener := range queue.syncListeners[topic] {
+		logrus.Tracef("MessageQueue: Notifying topic %s subscriber %p", topic, &listener)
+		listener(event)
 	}
 
 	logrus.Debugf("MessageQueue: Finished notifying all subscribers of topic %s.", topic)

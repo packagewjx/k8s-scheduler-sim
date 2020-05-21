@@ -35,7 +35,6 @@ func newFakePod(name string) *v1.Pod {
 }
 
 func TestScheduleOne(t *testing.T) {
-	logrus.SetLevel(logrus.TraceLevel)
 	sim := NewSchedulerSimulator(1000)
 
 	node := &v1.Node{
@@ -89,7 +88,6 @@ func TestScheduleOne(t *testing.T) {
 }
 
 func TestNodeClient(t *testing.T) {
-	logrus.SetLevel(logrus.DebugLevel)
 	sim := NewSchedulerSimulator(1000)
 	defer sim.(*schedSim).cancelFunc()
 
@@ -97,7 +95,7 @@ func TestNodeClient(t *testing.T) {
 
 	informer := sim.GetInformerFactory().Core().V1().Nodes().Informer()
 
-	ch := make(chan bool)
+	ch := make(chan bool, 1)
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			t.Log("added")
@@ -246,7 +244,7 @@ func TestPodClient(t *testing.T) {
 
 	podClient := sim.GetKubernetesClient().CoreV1().Pods(DefaultNamespace)
 	podInformer := sim.GetInformerFactory().Core().V1().Pods().Informer()
-	ch := make(chan bool)
+	ch := make(chan bool, 1)
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			t.Log("added")
@@ -387,7 +385,6 @@ func TestDeploy10Tick(t *testing.T) {
 }
 
 func TestDeployMultiplePods(t *testing.T) {
-	logrus.SetLevel(logrus.InfoLevel)
 	sim := NewSchedulerSimulator(300)
 	node := BuildNode("node-1", "10", "100G", "1000", FairScheduler)
 	_, err := sim.GetKubernetesClient().CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})

@@ -23,7 +23,7 @@ func TestNodeInformer(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	nodeInformer := factory.Core().V1().Nodes().Informer()
 	factory.Start(ctx.Done())
-	ch := make(chan *apicorev1.Node)
+	ch := make(chan *apicorev1.Node, 10)
 	nodeInformer.AddEventHandler(&cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			fmt.Println("add event")

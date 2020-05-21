@@ -2,6 +2,7 @@ package informers
 
 import (
 	"context"
+	"github.com/packagewjx/k8s-scheduler-sim/pkg/util"
 	apicorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -54,12 +55,7 @@ func (n *nodeInformer) Get(name string) (*apicorev1.Node, error) {
 }
 
 func (n *nodeInformer) defaultInformer(client kubernetes.Interface, resync time.Duration) cache.SharedIndexInformer {
-	watcher, err := client.CoreV1().Nodes().Watch(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		panic(err)
-	}
-
-	informer, err := NewSharedIndexInformer(watcher, nodeKeyFunc)
+	informer, err := NewSharedIndexInformer(util.TopicNode, nodeKeyFunc)
 	if err != nil {
 		panic("无法创建Node的SharedIndexInformer")
 	}

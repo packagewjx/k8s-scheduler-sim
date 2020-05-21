@@ -60,15 +60,9 @@ import (
 	"strconv"
 )
 
-var (
-	TopicNode          = "node"
-	TopicPod           = "pod"
-	TopicPriorityClass = "priorityclass"
-)
-
 func NewClient(sim *schedSim) (kubernetes.Interface, error) {
 	// New Topics here
-	topics := []string{TopicNode, TopicPod, TopicPriorityClass}
+	topics := []string{util.TopicNode, util.TopicPod, util.TopicPriorityClass}
 
 	for _, topic := range topics {
 		err := util.GetMessageQueue().NewTopic(topic)
@@ -432,7 +426,7 @@ func (client *coreV1NodeClient) Create(_ context.Context, node *apicorev1.Node, 
 		Type:   watch.Added,
 		Object: node,
 	}
-	err = util.GetMessageQueue().Publish(TopicNode, ev)
+	err = util.GetMessageQueue().Publish(util.TopicNode, ev)
 	if err != nil {
 		logrus.Errorf("Error publishing add event: %v", err)
 	}
@@ -463,7 +457,7 @@ func (client *coreV1NodeClient) Update(_ context.Context, node *apicorev1.Node, 
 		Type:   watch.Modified,
 		Object: node,
 	}
-	err = util.GetMessageQueue().Publish(TopicNode, ev)
+	err = util.GetMessageQueue().Publish(util.TopicNode, ev)
 	if err != nil {
 		logrus.Errorf("error publishing update event %v", err)
 	}
@@ -494,7 +488,7 @@ func (client *coreV1NodeClient) UpdateStatus(_ context.Context, node *apicorev1.
 		Type:   watch.Modified,
 		Object: node,
 	}
-	err = util.GetMessageQueue().Publish(TopicNode, ev)
+	err = util.GetMessageQueue().Publish(util.TopicNode, ev)
 	if err != nil {
 		logrus.Errorf("error publishing update event: %v", err)
 	}
@@ -521,7 +515,7 @@ func (client *coreV1NodeClient) Delete(_ context.Context, name string, _ apimach
 		Type:   watch.Deleted,
 		Object: &item.(*Node).Node,
 	}
-	err = util.GetMessageQueue().Publish(TopicNode, ev)
+	err = util.GetMessageQueue().Publish(util.TopicNode, ev)
 	if err != nil {
 		logrus.Errorf("Error publishing delete event: %v", err)
 	}
@@ -565,7 +559,7 @@ func (client *coreV1NodeClient) List(_ context.Context, _ apimachineryv1.ListOpt
 }
 
 func (client *coreV1NodeClient) Watch(_ context.Context, _ apimachineryv1.ListOptions) (watch.Interface, error) {
-	return util.GetMessageQueue().Subscribe(TopicNode)
+	return util.GetMessageQueue().Subscribe(util.TopicNode)
 }
 
 func (client *coreV1NodeClient) Patch(_ context.Context, _ string, _ types.PatchType, _ []byte, _ apimachineryv1.PatchOptions, _ ...string) (result *apicorev1.Node, err error) {
@@ -637,7 +631,7 @@ func (c *coreV1PodClient) Create(_ context.Context, pod *apicorev1.Pod, _ apimac
 		Type:   watch.Added,
 		Object: pod,
 	}
-	err = util.GetMessageQueue().Publish(TopicPod, ev)
+	err = util.GetMessageQueue().Publish(util.TopicPod, ev)
 	if err != nil {
 		logrus.Errorf("Error publishing add event: %v", err)
 	}
@@ -669,7 +663,7 @@ func (c *coreV1PodClient) Update(_ context.Context, pod *apicorev1.Pod, _ apimac
 		Type:   watch.Modified,
 		Object: pod,
 	}
-	err = util.GetMessageQueue().Publish(TopicPod, ev)
+	err = util.GetMessageQueue().Publish(util.TopicPod, ev)
 	if err != nil {
 		logrus.Errorf("Error publishing update event: %v", err)
 	}
@@ -698,7 +692,7 @@ func (c *coreV1PodClient) UpdateStatus(_ context.Context, pod *apicorev1.Pod, _ 
 		Type:   watch.Modified,
 		Object: pod,
 	}
-	err = util.GetMessageQueue().Publish(TopicPod, ev)
+	err = util.GetMessageQueue().Publish(util.TopicPod, ev)
 	if err != nil {
 		logrus.Errorf("Error publishing update event: %v", err)
 	}
@@ -733,7 +727,7 @@ func (c *coreV1PodClient) Delete(_ context.Context, name string, _ apimachineryv
 		Type:   watch.Deleted,
 		Object: &item.(*Pod).Pod,
 	}
-	err = util.GetMessageQueue().Publish(TopicPod, ev)
+	err = util.GetMessageQueue().Publish(util.TopicPod, ev)
 	if err != nil {
 		logrus.Errorf("Error publishing delete event: %v", err)
 	}
@@ -778,7 +772,7 @@ func (c *coreV1PodClient) List(_ context.Context, _ apimachineryv1.ListOptions) 
 }
 
 func (c *coreV1PodClient) Watch(_ context.Context, _ apimachineryv1.ListOptions) (watch.Interface, error) {
-	return util.GetMessageQueue().Subscribe(TopicPod)
+	return util.GetMessageQueue().Subscribe(util.TopicPod)
 }
 
 func (c *coreV1PodClient) Patch(_ context.Context, _ string, _ types.PatchType, _ []byte, _ apimachineryv1.PatchOptions, _ ...string) (result *apicorev1.Pod, err error) {
@@ -896,7 +890,7 @@ func (s *schedulingV1Client) List(opts apimachineryv1.ListOptions) (*apischeduli
 }
 
 func (s *schedulingV1Client) Watch(opts apimachineryv1.ListOptions) (watch.Interface, error) {
-	watcher, err := util.GetMessageQueue().Subscribe(TopicPriorityClass)
+	watcher, err := util.GetMessageQueue().Subscribe(util.TopicPriorityClass)
 	if err != nil {
 		return nil, errors.Wrap(err, "error subscribing PriorityClass Topic")
 	}

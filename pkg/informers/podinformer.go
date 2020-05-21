@@ -2,6 +2,7 @@ package informers
 
 import (
 	"context"
+	"github.com/packagewjx/k8s-scheduler-sim/pkg/util"
 	apicorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -58,12 +59,7 @@ func newPodInformer(client kubernetes.Interface, factory informers.SharedInforme
 }
 
 func (p *podInformer) defaultInformer(client kubernetes.Interface, _ time.Duration) cache.SharedIndexInformer {
-	watcher, err := client.CoreV1().Pods(DefaultNamespace).Watch(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		panic(err)
-	}
-
-	informer, err := NewSharedIndexInformer(watcher, podKeyFunc)
+	informer, err := NewSharedIndexInformer(util.TopicPod, podKeyFunc)
 	if err != nil {
 		panic(err)
 	}

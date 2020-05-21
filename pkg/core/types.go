@@ -117,7 +117,8 @@ const (
 
 // Controller 广义控制器，管理资源或者模拟负载情况等。Controller应当通过kubernetes.Interface访问集群资源
 type Controller interface {
-	// Tick 更新控制器状态的函数。本函数应该是同步的
+	// Tick 执行控制器逻辑的函数，控制器应该在此函数中将实际状态调整到期望状态。
+	// 本函数应该是同步的，且不应该使用通道，以免导致整个模拟阻塞。
 	Tick()
 }
 

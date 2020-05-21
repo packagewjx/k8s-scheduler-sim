@@ -5,6 +5,7 @@ import (
 	"context"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/util"
 	"k8s.io/api/core/v1"
+	"k8s.io/api/policy/v1beta1"
 	apimachineryv1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
@@ -345,7 +346,7 @@ func (f *fakeCoreV1Interface) PersistentVolumeClaims(namespace string) corev1.Pe
 }
 
 func (f *fakeCoreV1Interface) Pods(namespace string) corev1.PodInterface {
-	panic("implement me")
+	return &fakePodInterface{}
 }
 
 func (f *fakeCoreV1Interface) PodTemplates(namespace string) corev1.PodTemplateInterface {
@@ -438,5 +439,83 @@ func (f *fakeNodeInterface) Patch(ctx context.Context, name string, pt types.Pat
 }
 
 func (f *fakeNodeInterface) PatchStatus(ctx context.Context, nodeName string, data []byte) (*v1.Node, error) {
+	panic("implement me")
+}
+
+type fakePodInterface struct {
+}
+
+func (f *fakePodInterface) Create(ctx context.Context, pod *v1.Pod, _ apimachineryv1.CreateOptions) (*v1.Pod, error) {
+	ev := &watch.Event{
+		Type:   watch.Added,
+		Object: pod,
+	}
+	_ = util.GetMessageQueue().Publish(fakeTopicPod, ev)
+	return pod, nil
+}
+
+func (f *fakePodInterface) Update(ctx context.Context, pod *v1.Pod, opts apimachineryv1.UpdateOptions) (*v1.Pod, error) {
+	ev := &watch.Event{
+		Type:   watch.Modified,
+		Object: pod,
+	}
+	_ = util.GetMessageQueue().Publish(fakeTopicPod, ev)
+	return pod, nil
+}
+
+func (f *fakePodInterface) UpdateStatus(ctx context.Context, pod *v1.Pod, opts apimachineryv1.UpdateOptions) (*v1.Pod, error) {
+	return f.Update(ctx, pod, opts)
+}
+
+func (f *fakePodInterface) Delete(ctx context.Context, name string, opts apimachineryv1.DeleteOptions) error {
+	ev := &watch.Event{
+		Type: watch.Deleted,
+		Object: &v1.Pod{
+			ObjectMeta: apimachineryv1.ObjectMeta{
+				Name: name,
+			},
+		},
+	}
+	_ = util.GetMessageQueue().Publish(fakeTopicPod, ev)
+	return nil
+}
+
+func (f *fakePodInterface) DeleteCollection(ctx context.Context, opts apimachineryv1.DeleteOptions, listOpts apimachineryv1.ListOptions) error {
+	panic("implement me")
+}
+
+func (f *fakePodInterface) Get(ctx context.Context, name string, opts apimachineryv1.GetOptions) (*v1.Pod, error) {
+	panic("implement me")
+}
+
+func (f *fakePodInterface) List(ctx context.Context, opts apimachineryv1.ListOptions) (*v1.PodList, error) {
+	panic("implement me")
+}
+
+func (f *fakePodInterface) Watch(ctx context.Context, opts apimachineryv1.ListOptions) (watch.Interface, error) {
+	return util.GetMessageQueue().Subscribe(fakeTopicPod)
+}
+
+func (f *fakePodInterface) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts apimachineryv1.PatchOptions, subresources ...string) (result *v1.Pod, err error) {
+	panic("implement me")
+}
+
+func (f *fakePodInterface) GetEphemeralContainers(ctx context.Context, podName string, options apimachineryv1.GetOptions) (*v1.EphemeralContainers, error) {
+	panic("implement me")
+}
+
+func (f *fakePodInterface) UpdateEphemeralContainers(ctx context.Context, podName string, ephemeralContainers *v1.EphemeralContainers, opts apimachineryv1.UpdateOptions) (*v1.EphemeralContainers, error) {
+	panic("implement me")
+}
+
+func (f *fakePodInterface) Bind(ctx context.Context, binding *v1.Binding, opts apimachineryv1.CreateOptions) error {
+	panic("implement me")
+}
+
+func (f *fakePodInterface) Evict(ctx context.Context, eviction *v1beta1.Eviction) error {
+	panic("implement me")
+}
+
+func (f *fakePodInterface) GetLogs(name string, opts *v1.PodLogOptions) *rest.Request {
 	panic("implement me")
 }

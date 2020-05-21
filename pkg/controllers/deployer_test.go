@@ -8,35 +8,35 @@ import (
 	"time"
 )
 
-type fakeSchedulerSimulator struct {
+type deployerTestSimulator struct {
 	ch chan string
 }
 
-func (f *fakeSchedulerSimulator) GetKubernetesClient() kubernetes.Interface {
+func (f *deployerTestSimulator) GetKubernetesClient() kubernetes.Interface {
 	panic("implement me")
 }
 
-func (f *fakeSchedulerSimulator) GetInformerFactory() informers.SharedInformerFactory {
+func (f *deployerTestSimulator) GetInformerFactory() informers.SharedInformerFactory {
 	panic("implement me")
 }
 
-func (f *fakeSchedulerSimulator) Run() {
+func (f *deployerTestSimulator) Run() {
 	panic("implement me")
 }
 
-func (f *fakeSchedulerSimulator) RegisterBeforeUpdateController(controller core.Controller) {
+func (f *deployerTestSimulator) RegisterBeforeUpdateController(controller core.Controller) {
 	f.ch <- "before"
 }
 
-func (f *fakeSchedulerSimulator) RegisterAfterUpdateController(controller core.Controller) {
+func (f *deployerTestSimulator) RegisterAfterUpdateController(controller core.Controller) {
 	f.ch <- "after"
 }
 
-func (f *fakeSchedulerSimulator) DeleteBeforeController(controller core.Controller) {
+func (f *deployerTestSimulator) DeleteBeforeController(controller core.Controller) {
 	panic("implement me")
 }
 
-func (f *fakeSchedulerSimulator) DeleteAfterController(controller core.Controller) {
+func (f *deployerTestSimulator) DeleteAfterController(controller core.Controller) {
 	panic("implement me")
 }
 
@@ -48,7 +48,7 @@ func (f fakeController) Tick() {
 }
 
 func TestDeployer(t *testing.T) {
-	sim := &fakeSchedulerSimulator{ch: make(chan string, 1)}
+	sim := &deployerTestSimulator{ch: make(chan string, 1)}
 
 	deployer := NewControllerDeployer(sim)
 

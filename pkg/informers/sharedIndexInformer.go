@@ -15,7 +15,7 @@ func NewSharedIndexInformer(watcher watch.Interface, keyFunc cache.KeyFunc) (cac
 	return &sharedIndexInformer{
 		keyFunc:      keyFunc,
 		watcher:      watcher,
-		listenerChan: make(chan cache.ResourceEventHandler),
+		listenerChan: make(chan newHandlerEvent),
 		store:        cache.NewStore(keyFunc),
 		isStop:       false,
 	}, nil
@@ -25,7 +25,7 @@ type sharedIndexInformer struct {
 	keyFunc       cache.KeyFunc
 	watcher       watch.Interface
 	store         cache.Store
-	listenerChan  chan cache.ResourceEventHandler
+	listenerChan  chan newHandlerEvent
 	listeners     []cache.ResourceEventHandler
 	channelClosed bool
 	isStarted     bool
@@ -35,6 +35,12 @@ type sharedIndexInformer struct {
 
 func (s *sharedIndexInformer) AddEventHandler(handler cache.ResourceEventHandler) {
 	s.AddEventHandlerWithResyncPeriod(handler, 0)
+}
+
+type newHandlerEvent struct {
+	handler cache.ResourceEventHandler
+	// addedCh 控制添加监听器的同步性
+	addedCh chan bool
 }
 
 func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler cache.ResourceEventHandler, resyncPeriod time.Duration) {
@@ -47,10 +53,15 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler cache.Reso
 		return
 	}
 	if s.isStarted {
-		s.listenerChan <- handler
+		nh := newHandlerEvent{
+			handler: handler,
+			addedCh: make(chan bool),
+		}
+		s.listenerChan <- nh
 	} else {
 		s.lock.Lock()
 		s.listeners = append(s.listeners, handler)
+		logrus.Debugf("Added new listener %p", &handler)
 		s.lock.Unlock()
 	}
 
@@ -135,9 +146,19 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 			case watch.Error:
 				logrus.Errorf("Received Error Event: %v", ev.Object)
 			}
-		case listener := <-s.listenerChan:
+		case listenerEvent := <-s.listenerChan:
+			listener := listenerEvent.handler
 			logrus.Debugf("Added new listener %p", &listener)
 			s.listeners = append(s.listeners, listener)
+			// notify that listener all added resource
+			list := s.store.List()
+			if len(list) > 0 {
+				logrus.Debugf("Sending new listener all added resources")
+				for _, item := range list {
+					listener.OnAdd(item)
+				}
+			}
+			listenerEvent.addedCh <- true
 		}
 	}
 }

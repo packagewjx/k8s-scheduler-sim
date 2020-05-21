@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/core"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/informers"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/util/fake"
@@ -16,7 +17,7 @@ import (
 )
 
 func TestReplication(t *testing.T) {
-	logrus.SetLevel(logrus.DebugLevel)
+	logrus.SetLevel(logrus.TraceLevel)
 	client := fake.NewFakeKubernetesInterface()
 	sim := &replicationTestSimulator{
 		client:  client,
@@ -29,17 +30,22 @@ func TestReplication(t *testing.T) {
 
 	replicaNum := 10
 	startChan := make(chan bool, replicaNum)
+	deleteChan := make(chan bool, replicaNum)
 	sim.factory.Core().V1().Pods().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			startChan <- true
 		},
 		UpdateFunc: nil,
-		DeleteFunc: nil,
+		DeleteFunc: func(obj interface{}) {
+			deleteChan <- true
+		},
 	})
 	sim.factory.Start(stopCh)
 
+	pods := make([]*v1.Pod, 0, 10)
+
 	rc := NewReplicationController(sim, "test", replicaNum, func() *v1.Pod {
-		return &v1.Pod{
+		pod := &v1.Pod{
 			TypeMeta: metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{
 				Name: string(uuid.NewUUID()),
@@ -47,6 +53,8 @@ func TestReplication(t *testing.T) {
 			Spec:   v1.PodSpec{},
 			Status: v1.PodStatus{},
 		}
+		pods = append(pods, pod)
+		return pod
 	})
 
 	// init tick
@@ -62,6 +70,32 @@ func TestReplication(t *testing.T) {
 		}
 	}
 
+	// 结束一个Pod，测试是否重启
+	pods[0].Status.Phase = v1.PodSucceeded
+	_, err := client.CoreV1().Pods(core.DefaultNamespace).UpdateStatus(context.TODO(), pods[0], metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Update failed")
+	}
+
+	// 更新状态
+	rc.Tick()
+
+	select {
+	case <-startChan:
+	case <-time.After(time.Second):
+		t.Error("no deploy for deleted pod")
+	}
+
+	// 调用Terminate
+	rc.Terminate()
+	for i := 0; i < replicaNum; i++ {
+		rc.Tick()
+		select {
+		case <-deleteChan:
+		case <-time.After(time.Second):
+			t.Error("no delete")
+		}
+	}
 }
 
 type replicationTestSimulator struct {

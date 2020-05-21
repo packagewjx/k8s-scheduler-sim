@@ -7,6 +7,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
+	"time"
 )
 
 func NewReplicationController(sim core.SchedulerSimulator, controllerName string, replicaNum int, podFactory func() *v1.Pod) ReplicationController {
@@ -88,6 +89,8 @@ func (r *replicationController) Tick() {
 				}
 			},
 		})
+		// Ensure handler has successfully created
+		<-time.After(100 * time.Millisecond)
 		r.state = running
 	case terminated:
 		// r.sim.DeleteBeforeController(r)
@@ -103,7 +106,7 @@ func (r *replicationController) Tick() {
 		}
 		r.state = waitForPodTerminate
 	case waitForPodTerminate:
-		logrus.Infof("ReplicationController %s waiting for pod termination.", r.name)
+		logrus.Infof("ReplicationController %s: waiting for pod termination.", r.name)
 		terminatedPod := make([]*v1.Pod, 0, 10)
 		for _, pod := range r.replicas {
 			if pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded {
@@ -112,10 +115,17 @@ func (r *replicationController) Tick() {
 			}
 		}
 		for _, pod := range terminatedPod {
+			err := r.sim.GetKubernetesClient().CoreV1().Pods(core.DefaultNamespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
+			if err != nil {
+				logrus.Errorf("ReplicationController %s: delete pod %s failed: %v", r.name, pod.Name, err)
+				// delete next tick
+				continue
+			}
 			delete(r.replicas, pod.Name)
 		}
 
 		if len(r.replicas) == 0 {
+			logrus.Infof("ReplicationController %s terminate successfully", r.name)
 			r.state = terminated
 		}
 	case running:
@@ -145,7 +155,7 @@ func (r *replicationController) Tick() {
 				}
 			}
 		} else if len(r.replicas) < r.replicaNum {
-			logrus.Infof("ReplicationController %s: Pod is not enough, starting pods.", r.name)
+			logrus.Infof("ReplicationController %s: Pod is not enough, creating pods.", r.name)
 			// 启动Pod，以满足数量
 			for len(r.replicas) < r.replicaNum {
 				pod := r.podFactory()
@@ -156,7 +166,7 @@ func (r *replicationController) Tick() {
 				pod.Annotations[annotationReplicationController] = r.name
 				podName := pod.Name
 
-				logrus.Infof("ReplicationController %s: Starting pod %s", r.name, pod.Name)
+				logrus.Infof("ReplicationController %s: Creating pod %s", r.name, pod.Name)
 				pod, err := r.sim.GetKubernetesClient().CoreV1().Pods(core.DefaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 				if err != nil {
 					logrus.Errorf("ReplicationController %s: error creating pod %s: %v", r.name, podName, err)

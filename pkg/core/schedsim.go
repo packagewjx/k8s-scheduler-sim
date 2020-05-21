@@ -21,18 +21,29 @@ import (
 const DefaultNamespace = ""
 
 type SchedulerSimulator interface {
+	// Client 获取访问集群资源的客户端接口，目前已经实现了的接口有Pod与Node的接口。
+	// 注意，在执行Create，Update与Delete等函数的时候，会通知所有监听资源事件的所有监听器，即调用监听器的回调函数。如果
+	// 回调函数中需要访问通道，锁等对象，需要保证不会阻塞，否则将会让整个模拟器停滞。
 	GetKubernetesClient() kubernetes.Interface
 
+	// GetInformerFactory 获取事件通知器的工厂。事件通知器采用回调的方式通知，在对应事件触发的时候，调用指定的事件通知
+	// 函数。
 	GetInformerFactory() k8sinformers.SharedInformerFactory
 
+	// Run 开始模拟，并将集群统计数据输出到标准输出
 	Run()
 
+	// RegisterBeforeUpdateController 注册新的控制器，控制器将会在Node的Tick之前得到调用，通常用于维护集群状态，调用服务
+	// 等功能。
 	RegisterBeforeUpdateController(controller Controller)
 
+	// RegisterAfterUpdateController 注册新的控制器，在Tick之后得到调用。通常用于收集监控数据
 	RegisterAfterUpdateController(controller Controller)
 
+	// DeleteBeforeController 删除Tick前控制器。
 	DeleteBeforeController(controller Controller)
 
+	// DeleteAfterController 删除Tick后控制器
 	DeleteAfterController(controller Controller)
 }
 

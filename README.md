@@ -69,23 +69,33 @@
 4. 根据时间片以及`Pod`所需的内存，更新`Pod`的状态。
 5. 根据`Pod`返回的负载信息，更新节点的负载情况。
 
+### `Controller`
+
+类似Kubernetes的Controller，负责集群状态的维护工作。但是本模拟器使用的是同步设计，因此Controller的逻辑是同步执行的。
+Controller可以在Node的Tick函数之前得到调用，此时通常用于部署新的Pod，更改Pod的状态等工作，或者在Tick之后，此时可以收集
+监控数据。
+
+Controller接口仅有一个`Tick()`函数，实现的函数可以使用`kubernetes.Interface`访问集群的数据，并作出相应的操作。
+
+目前集群实现了两个Controller
+
+- ControllerDeployer：在指定Tick数部署指定的Controller。
+- ReplicationController：控制Pod的数量为指定的值。
+
 ## TODO List
 
 - [ ] 数据读取接口的设计
-  - [x] DeploymentController设计。用于在每个时钟周期向集群提交数据
-  - [ ] 使用阿里巴巴2017年数据，实现符合该数据集的DeploymentController
+  - [ ] 使用阿里巴巴2017年数据，实现符合该数据集的Controller
 - [ ] 模拟器设计
   - [x] Pod模拟器设计
     - [x] 初步可运行框架设计
     - [x] 整合Kubernetes API的Pod
     - [x] 批处理Pod算法实现
-    - [ ] 在线服务Pod算法实现
+    - [x] 在线服务Pod算法实现
   - [x] Node模拟器设计
     - [x] 模拟节点运行逻辑设计
     - [x] 整合Kubernetes API的Node
-  - [ ] DeploymentController设计
   - [ ] Service设计
-    - [ ] Service的PodAlgorithm设计
     - [ ] Service逻辑设计，如控制Pod的负载
     - [ ] Service响应时间监控
   - [ ] client-go接口实现
@@ -96,6 +106,10 @@
   - [x] 调度Pod
     - [x] 将新的Pod放入调度队列
     - [x] 将Pod与Node绑定
+  - [ ] Controller设计
+    - [x] ReplicationController，用于控制Pod的数量
+    - [x] ControllerDeployer，用于在特定Tick部署控制器 
+    - [ ] 根据需求引入新的Controller
 - [ ] 监控系统的设计
   - [x] 监控数据设计
   - [x] 节点监控数据采集

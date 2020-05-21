@@ -85,14 +85,14 @@ func (queue *synchronizedMessageQueue) Publish(topic string, event *watch.Event)
 	queue.lock.RLock()
 	defer queue.lock.RUnlock()
 
-	logrus.Debugf("Publishing event %v", event)
+	logrus.Debugf("MessageQueue: Publishing to topic %s of event %v", topic, event)
 
 	for _, listener := range queue.listeners[topic] {
-		logrus.Tracef("Notifying subscriber %p", &listener)
+		logrus.Tracef("MessageQueue: Notifying topic %s subscriber %p", topic, &listener)
 		listener <- *event
 	}
 
-	logrus.Debugf("Finished notifying all subscribers.")
+	logrus.Debugf("MessageQueue: Finished notifying all subscribers of topic %s.", topic)
 	return nil
 }
 
@@ -106,7 +106,7 @@ func (queue *synchronizedMessageQueue) newChannel(topic string) chan watch.Event
 
 	ch := make(chan watch.Event)
 	queue.listeners[topic] = append(queue.listeners[topic], ch)
-	logrus.Debugf("Creating new subscriber %p", &ch)
+	logrus.Debugf("MessageQueue: Creating new topic %s subscriber %p", topic, &ch)
 	return ch
 }
 

@@ -29,7 +29,7 @@ type Node struct {
 	// 上一轮的CPU使用百分比，用于查看是否有资源竞争，模拟高资源竞争时CPU处理能力的下降
 	LastCpuUsage float64
 
-	bindLock sync.Mutex
+	podLock sync.Mutex
 
 	Client kubernetes.Interface
 
@@ -68,8 +68,9 @@ func BuildNode(name string, cpu, mem, numPods, coreScheduler string) *v1.Node {
 
 // TODO 可能会有一些绑定失败的条件，如内存不够用等
 func (n *Node) BindPod(pod *Pod) error {
-	n.bindLock.Lock()
-	defer n.bindLock.Unlock()
+	// 这里需要上锁是因为可能有多条调度器线程同时更改
+	n.podLock.Lock()
+	defer n.podLock.Unlock()
 
 	logrus.Infof("Binding Pod %s to Node %s", pod.Name, n.Name)
 
@@ -81,6 +82,7 @@ func (n *Node) BindPod(pod *Pod) error {
 	n.Pods[key] = pod
 
 	pod.Spec.NodeName = n.Name
+	pod.Status.Phase = v1.PodRunning
 	_, err := n.Client.CoreV1().Pods(DefaultNamespace).UpdateStatus(context.TODO(), &pod.Pod, metav1.UpdateOptions{})
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("error updating status of pod %s", pod.Name))
@@ -134,13 +136,6 @@ func (n *Node) Tick(client kubernetes.Interface) *metrics.TickMetrics {
 				slot: make([]float64, 0),
 				mem:  mem,
 			})
-		} else if pod.Status.Phase == v1.PodPending {
-			pod.Status.Phase = v1.PodRunning
-			pod.Spec.NodeName = n.Name
-			_, err := client.CoreV1().Pods(DefaultNamespace).UpdateStatus(context.TODO(), &pod.Pod, metav1.UpdateOptions{})
-			if err != nil {
-				logrus.Errorf("Error Updating Pod %s Status", pod.Name)
-			}
 		} else {
 			if _, ok := n.deletingPods[pod.Name]; !ok {
 				// 自发停止的Pod执行删除

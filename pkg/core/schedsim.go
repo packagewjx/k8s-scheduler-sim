@@ -14,6 +14,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/scheduler"
+	"sync"
 	"time"
 
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
@@ -71,10 +72,6 @@ type schedSim struct {
 
 	// AfterUpdate 在更新Pod状态之后调用的控制器函数，通常用于监控统计等
 	afterUpdate []Controller
-
-	// 用于控制调度器调度添加速率的两个通道
-	addCount  int
-	bindPodCh chan string
 }
 
 var _ SchedulerSimulator = &schedSim{}
@@ -181,6 +178,34 @@ func (sim *schedSim) Run() {
 
 	nodeMetrics := make(map[*Node]metrics.Aggregator)
 
+	// 添加事件监听器以监听绑定事件
+	wg := sync.WaitGroup{}
+	newPods := map[string]bool{}
+	sim.InformerFactory.Core().V1().Pods().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			newPods[obj.(*v1.Pod).Name] = true
+			wg.Add(1)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			pod := newObj.(*v1.Pod)
+			if _, ok := newPods[pod.Name]; ok {
+				delete(newPods, pod.Name)
+				if pod.Spec.NodeName != "" {
+					wg.Done()
+				} else {
+					for _, condition := range pod.Status.Conditions {
+						if condition.Reason == v1.PodReasonUnschedulable {
+							logrus.Warnf("Pod %s scheduled failed: %s", pod.Name, condition.Message)
+							wg.Done()
+							break
+						}
+					}
+				}
+			}
+		},
+		DeleteFunc: nil,
+	})
+
 	for tick := 0; tick < sim.TotalTick; tick++ {
 		logrus.Infof("Tick %d", tick)
 		logrus.Debug("Running BeforeUpdate Controllers")
@@ -188,28 +213,8 @@ func (sim *schedSim) Run() {
 		for _, controller := range sim.beforeUpdate {
 			controller.Tick()
 		}
-		//等待bind
-		shouldBreak := false
-		timeoutCh := time.After(time.Second)
-		completed := 0
-		for i := 0; i < sim.addCount && !shouldBreak; i++ {
-			logrus.Debugf("Waiting to schedule pod, %d remaining", sim.addCount)
-			select {
-			case res := <-sim.bindPodCh:
-				completed++
-				podName := res[1:]
-				if res[0] == 'T' {
-					logrus.Debugf("Pod %s bind success", podName)
-				} else /*F*/ {
-					logrus.Infof("Pod %s scheduled failed", podName)
-				}
-			case <-timeoutCh:
-				// 若调度超时则退出
-				logrus.Infof("Schedule time out, %d remaining pod", sim.addCount)
-				shouldBreak = true
-			}
-		}
-		sim.addCount -= completed
+		// 等待调度器线程bind
+		wg.Wait()
 
 		logrus.Debug("Updating Node status")
 		nodes := sim.Nodes.List()
@@ -297,20 +302,4 @@ func (sim *schedSim) deleteController(controller Controller, timing controllerTi
 		(*arr)[idx] = (*arr)[len(*arr)-1]
 		*arr = (*arr)[:len(*arr)-1]
 	}
-}
-
-// podAdded 通知创建了新的Pod。注意，本函数应该运行在与SchedSim不同的Goroutine中，否则会永久阻塞。‘
-// 由于通道无法保证完全的同步，因此使用本方法同步的通知
-func (sim *schedSim) podAdded(podName string) {
-	sim.addCount++
-}
-
-// podScheduledSuccess 通知调度成功。注意，本函数应该运行在与SchedSim不同的Goroutine中，否则会永久阻塞。
-func (sim *schedSim) podScheduledSuccess(podName string) {
-	sim.bindPodCh <- "T" + podName
-}
-
-// podScheduledFailed 通知调度失败。注意，本函数应该运行在与SchedSim不同的Goroutine中，否则会永久阻塞。
-func (sim *schedSim) podScheduledFailed(podName string) {
-	sim.bindPodCh <- "F" + podName
 }

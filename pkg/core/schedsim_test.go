@@ -71,6 +71,17 @@ func TestScheduleOne(t *testing.T) {
 
 	podName := "fakepod"
 	pod := newFakePod(podName)
+	bindCh := make(chan bool, 1)
+	sim.GetInformerFactory().Core().V1().Pods().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: nil,
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			pod := newObj.(*v1.Pod)
+			if pod.Name == podName && pod.Spec.NodeName != "" {
+				bindCh <- true
+			}
+		},
+		DeleteFunc: nil,
+	})
 
 	pod, err = sim.GetKubernetesClient().CoreV1().Pods(DefaultNamespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
@@ -78,12 +89,9 @@ func TestScheduleOne(t *testing.T) {
 	}
 
 	select {
-	case str := <-sim.(*schedSim).bindPodCh:
-		if str[0] != 'T' {
-			t.Error("Schedule failed")
-		}
+	case <-bindCh:
 	case <-time.After(time.Second):
-		t.Error("Schedule failed")
+		t.Errorf("Schedule time out")
 	}
 }
 

@@ -12,6 +12,12 @@ type deployerTestSimulator struct {
 	ch chan string
 }
 
+var _ core.SchedulerSimulator = &deployerTestSimulator{}
+
+func (f *deployerTestSimulator) GetPod(name string) (*core.Pod, error) {
+	panic("implement me")
+}
+
 func (f *deployerTestSimulator) GetKubernetesClient() kubernetes.Interface {
 	panic("implement me")
 }

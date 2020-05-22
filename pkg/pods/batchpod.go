@@ -9,9 +9,14 @@ import (
 
 // batchPodAlgorithm 模拟批处理任务的Pod，默认一直在跑任务，因此负载一直为1，内存使用基本固定
 type batchPodAlgorithm struct {
-	Pod       *core.Pod
-	MemUsage  int64
-	TotalTick float64
+	Pod           *core.Pod
+	markTerminate bool
+	MemUsage      int64
+	TotalTick     float64
+}
+
+func (alg *batchPodAlgorithm) Terminate() {
+	alg.markTerminate = true
 }
 
 type BatchPodState struct {
@@ -31,9 +36,10 @@ var BatchPodFactory core.PodAlgorithmFactory = func(stateJson string, pod *core.
 	}
 
 	return &batchPodAlgorithm{
-		Pod:       pod,
-		MemUsage:  state.MemUsage,
-		TotalTick: state.TotalTick,
+		Pod:           pod,
+		MemUsage:      state.MemUsage,
+		TotalTick:     state.TotalTick,
+		markTerminate: false,
 	}, nil
 }
 
@@ -42,7 +48,7 @@ func (alg *batchPodAlgorithm) ResourceRequest() (cpu float64, mem int64) {
 }
 
 func (alg *batchPodAlgorithm) Tick(slot []float64, mem int64) (Load float64, MemUsage int64) {
-	if alg.TotalTick < 0 {
+	if alg.TotalTick < 0 || alg.markTerminate {
 		alg.Pod.Status.Phase = v1.PodSucceeded
 		return 0, 0
 	}

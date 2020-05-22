@@ -32,6 +32,13 @@ type Node struct {
 	bindLock sync.Mutex
 
 	Client kubernetes.Interface
+
+	deletingPods map[string]*podDeletion
+}
+
+type podDeletion struct {
+	// tickLeft 还剩多少Tick停止，在完全删除之前
+	tickLeft int
 }
 
 func BuildNode(name string, cpu, mem, numPods, coreScheduler string) *v1.Node {
@@ -88,9 +95,8 @@ func (n *Node) EvictPod(pod *Pod) error {
 }
 
 // 根据节点拥有的Pod，更新当前的节点状态，包括资源使用率，Pod状态等
-// TODO 内存分配
+// TODO 引入物理内存超分配时的时间片惩罚
 func (n *Node) Tick(client kubernetes.Interface) *metrics.TickMetrics {
-	terminatedPods := make([]*Pod, 0)
 	type PodResource struct {
 		slot     []float64
 		mem      int64
@@ -105,6 +111,22 @@ func (n *Node) Tick(client kubernetes.Interface) *metrics.TickMetrics {
 	// 查看Pod的状态
 	for _, pod := range n.Pods {
 		if pod.Status.Phase == v1.PodRunning {
+			// 首先检查是否是超时删除的Pod
+			if podDeletion, ok := n.deletingPods[pod.Name]; ok {
+				podDeletion.tickLeft--
+				if podDeletion.tickLeft <= 0 {
+					// 执行立即删除
+					zero := int64(0)
+					err := n.Client.CoreV1().Pods(DefaultNamespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{
+						GracePeriodSeconds: &zero,
+					})
+					if err != nil {
+						logrus.Errorf("error deleting pod %s from node %s", pod.Name, n.Name)
+					}
+					continue
+				}
+			}
+
 			_, mem := pod.Algorithm.ResourceRequest()
 			podIdxMap[pod] = len(podResource)
 			readyPods = append(readyPods, pod)
@@ -120,22 +142,31 @@ func (n *Node) Tick(client kubernetes.Interface) *metrics.TickMetrics {
 				logrus.Errorf("Error Updating Pod %s Status", pod.Name)
 			}
 		} else {
-			terminatedPods = append(terminatedPods, pod)
+			if _, ok := n.deletingPods[pod.Name]; !ok {
+				// 自发停止的Pod执行删除
+				logrus.Infof("Pod %s is now %s", pod.Name, pod.Status.Phase)
+				_, err := client.CoreV1().Pods(DefaultNamespace).UpdateStatus(context.TODO(), &pod.Pod, metav1.UpdateOptions{})
+				if err != nil {
+					logrus.Errorf("Node %s Update pod status for pod %s error: %v", n.Name, pod.Name, err)
+				}
+				// 从本节点移除
+				logrus.Tracef("Removing Pod %s from Node %s", pod.Name, n.Name)
+				key, _ := PodKeyFunc(pod)
+				delete(n.Pods, key)
+			} else {
+				// 控制停止的Pod停止了
+				logrus.Infof("Pod %s has successfully terminated", pod.Name)
+				zero := int64(0)
+				// 由于无法分清楚是谁发送的GracePeriodSeconds为0的请求，因此这里不执行实际删除，依赖Client调用DeletePod
+				// 函数进行实际的删除
+				err := client.CoreV1().Pods(DefaultNamespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{
+					GracePeriodSeconds: &zero,
+				})
+				if err != nil {
+					logrus.Errorf("error deleting pod %s from node %s", pod.Name, n.Name)
+				}
+			}
 		}
-	}
-
-	logrus.Debugf("Node %s Terminating Pods", n.Name)
-	for _, pod := range terminatedPods {
-		logrus.Infof("Pod %s is now %s", pod.Name, pod.Status.Phase)
-		// TODO 通过watch.Interface通知Pods结束
-		_, err := client.CoreV1().Pods(DefaultNamespace).UpdateStatus(context.TODO(), &pod.Pod, metav1.UpdateOptions{})
-		if err != nil {
-			logrus.Errorf("Node %s Update pod status for pod %s error: %v", n.Name, pod.Name, err)
-		}
-		// 从本节点移除
-		logrus.Tracef("Removing Pod %s from Node %s", pod.Name, n.Name)
-		key, _ := PodKeyFunc(pod)
-		delete(n.Pods, key)
 	}
 
 	// 执行调度算法
@@ -193,6 +224,25 @@ func (n *Node) Tick(client kubernetes.Interface) *metrics.TickMetrics {
 		MemUsage: float64(memUsed) / float64(memSize),
 		Load:     load,
 	}
+
+}
+
+func (n *Node) DeletePod(name string, gracefulTick int) error {
+	pod, ok := n.Pods[name]
+	if !ok {
+		return fmt.Errorf("no pod %s", name)
+	}
+	if gracefulTick == 0 {
+		// 等于0的时候，相当于强制删除
+		delete(n.Pods, name)
+		delete(n.deletingPods, name)
+	} else {
+		// 标记删除，然后Node会在删除时向集群发送删除通知
+		n.deletingPods[name] = &podDeletion{tickLeft: gracefulTick}
+		// 告知需要停止
+		pod.Algorithm.Terminate()
+	}
+	return nil
 
 }
 

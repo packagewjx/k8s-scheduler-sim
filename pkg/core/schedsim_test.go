@@ -449,3 +449,83 @@ func (d *deployMultiplePodsController) Tick() {
 	}
 	d.sim.DeleteBeforeController(d)
 }
+
+func TestDeletePod(t *testing.T) {
+	sim := NewSchedulerSimulator(10).(*schedSim)
+
+	// hacking
+	podName := "test"
+	nodeName := "testNode"
+	alg := &deletePodAlgorithm{}
+	pod, _ := BuildPodUsingAlgorithm(podName, 1, 1, alg, v1.DefaultSchedulerName)
+	alg.pod = pod
+	pod.Status.Phase = v1.PodRunning
+	pod.Spec.NodeName = nodeName
+	_ = sim.Pods.Add(pod)
+
+	node := BuildNode(nodeName, "1", "1G", "1", FairScheduler)
+	node, err := sim.Client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	item, _, _ := sim.Nodes.GetByKey(nodeName)
+	simNode := item.(*Node)
+	simNode.Pods[podName] = pod
+
+	tick := 0
+	killAt5 := &ControllerFunc{TickFunc: func() {
+		tick++
+		if tick == 5 {
+			five := int64(5)
+			err := sim.GetKubernetesClient().CoreV1().Pods(DefaultNamespace).Delete(context.TODO(), podName, metav1.DeleteOptions{
+				GracePeriodSeconds: &five,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}}
+	checkAt6 := &ControllerFunc{
+		TickFunc: func() {
+			if tick >= 6 {
+				if _, exist := simNode.Pods[podName]; exist {
+					t.Log("Pod still exist")
+				}
+			}
+		},
+	}
+
+	sim.RegisterBeforeUpdateController(killAt5)
+	sim.RegisterAfterUpdateController(checkAt6)
+
+	sim.Run()
+
+	if _, ok := simNode.Pods[podName]; ok {
+		t.Errorf("Pod still exist")
+	}
+	if _, ok, _ := sim.Pods.GetByKey(podName); ok {
+		t.Errorf("Pod exist in cluster store")
+	}
+}
+
+type deletePodAlgorithm struct {
+	pod       *Pod
+	terminate bool
+}
+
+func (d *deletePodAlgorithm) Tick(slot []float64, mem int64) (Load float64, MemUsage int64) {
+	if d.terminate {
+		d.pod.Status.Phase = v1.PodSucceeded
+		return 0, 0
+	} else {
+		return 1, 1
+	}
+}
+
+func (d *deletePodAlgorithm) ResourceRequest() (cpu float64, mem int64) {
+	return 1, 1
+}
+
+func (d *deletePodAlgorithm) Terminate() {
+	d.terminate = true
+}

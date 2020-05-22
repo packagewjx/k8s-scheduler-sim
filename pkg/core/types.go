@@ -41,7 +41,7 @@ func (p *Pod) DeepCopyObject() runtime.Object {
 	}
 }
 
-func BuildPod(name string, cpuLimit float64, memLimit int, algorithm string, deploymentController string, initState interface{}, schedulerName string) (*v1.Pod, error) {
+func BuildV1Pod(name string, cpuLimit float64, memLimit int, algorithm string, deploymentController string, initState interface{}, schedulerName string) (*v1.Pod, error) {
 	stateBytes, err := json.Marshal(initState)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to marshal initState")
@@ -72,6 +72,24 @@ func BuildPod(name string, cpuLimit float64, memLimit int, algorithm string, dep
 	}, nil
 }
 
+func BuildPodUsingAlgorithm(name string, cpuLimit float64, memLimit int64, alg PodAlgorithm, schedulerName string) (*Pod, error) {
+	return &Pod{
+		Pod: v1.Pod{
+			TypeMeta: metav1.TypeMeta{},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+			Spec: v1.PodSpec{
+				SchedulerName: schedulerName,
+			},
+			Status: v1.PodStatus{},
+		},
+		CpuLimit:  cpuLimit,
+		MemLimit:  memLimit,
+		Algorithm: alg,
+	}, nil
+}
+
 type PodAlgorithm interface {
 	// 返回当前一个时钟滴答内的使用率。
 	// slot 为Pod分配到的时间片的大小的数组，每个值取值0～1，数组长度代表分配到的CPU数量。在负载一定的情况下，
@@ -86,6 +104,9 @@ type PodAlgorithm interface {
 	// mem 节点空闲内存数量。这部分内存尚未使用，而另一部分内存则被Pod占用。Pod可以选择提高Mem，也可以降低Mem使用。
 	//     不能超过本Pod的限制。
 	ResourceRequest() (cpu float64, mem int64)
+
+	// 通知Pod执行结束工作。Pod应该在后面的Tick中执行结束的逻辑
+	Terminate()
 }
 
 type PodAlgorithmFactory func(argJson string, pod *Pod) (PodAlgorithm, error)
@@ -122,6 +143,14 @@ type Controller interface {
 	Tick()
 }
 
+type ControllerFunc struct {
+	TickFunc func()
+}
+
+func (c ControllerFunc) Tick() {
+	c.TickFunc()
+}
+
 // DeploymentController 模拟Kubernetes的控制器，根据其配置的模板构建Pod，然后通过Tick方法提交到本集群
 // 用户可以实现本接口，以定制Pod的提交。如批处理任务中某些Pod先于另一些Pod提交，或者在线业务中，压力增大时提交更多的Pod的
 // 逻辑。
@@ -146,6 +175,10 @@ type RunEntity struct {
 const testPod = "test"
 
 type testPodAlgorithm struct {
+}
+
+func (t *testPodAlgorithm) Terminate() {
+	panic("implement me")
 }
 
 func (t *testPodAlgorithm) Tick(_ []float64, _ int64) (Load float64, MemUsage int64) {

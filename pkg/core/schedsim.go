@@ -6,6 +6,7 @@ import (
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/informers"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/metrics"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/mock"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
@@ -45,6 +46,9 @@ type SchedulerSimulator interface {
 
 	// DeleteAfterController 删除Tick后控制器
 	DeleteAfterController(controller Controller)
+
+	// GetPod 获取实际创建的Pod，以让控制器得以控制其行为，如分配负载等
+	GetPod(name string) (*Pod, error)
 }
 
 type schedSim struct {
@@ -81,6 +85,17 @@ func (sim *schedSim) GetInformerFactory() k8sinformers.SharedInformerFactory {
 
 func (sim *schedSim) GetKubernetesClient() kubernetes.Interface {
 	return sim.Client
+}
+
+func (sim *schedSim) GetPod(name string) (*Pod, error) {
+	pod, exist, err := sim.Pods.GetByKey(name)
+	if !exist {
+		return nil, fmt.Errorf("No pod %s", name)
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("error getting pod %s", name))
+	}
+	return pod.(*Pod), nil
 }
 
 var (

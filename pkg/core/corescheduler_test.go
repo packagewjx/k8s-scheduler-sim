@@ -9,6 +9,12 @@ import (
 type mockAlgorithm struct {
 }
 
+func (_ *mockAlgorithm) Terminate() {
+	panic("implement me")
+}
+
+var _ PodAlgorithm = &mockAlgorithm{}
+
 func (_ *mockAlgorithm) ResourceRequest() (cpu float64, mem int64) {
 	return 1, 1
 }

@@ -103,6 +103,10 @@ type replicationTestSimulator struct {
 	factory k8sinformers.SharedInformerFactory
 }
 
+func (f *replicationTestSimulator) GetPod(name string) (*core.Pod, error) {
+	panic("implement me")
+}
+
 func (f *replicationTestSimulator) GetKubernetesClient() kubernetes.Interface {
 	return f.client
 }

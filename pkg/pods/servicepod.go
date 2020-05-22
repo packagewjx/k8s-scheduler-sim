@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/core"
 	"github.com/pkg/errors"
+	v1 "k8s.io/api/core/v1"
 )
 
 // ServicePod 模拟在线服务处理的Pod算法。一般情况下，一个应用程序进程通常会处理大量的请求，通常使用多线程进行处理，因此
@@ -55,6 +56,7 @@ var simServicePodFacory core.PodAlgorithmFactory = func(argJson string, pod *cor
 		return nil, errors.Wrap(err, "error unmarshal arg json")
 	}
 	return &simServicePod{
+		pod:     pod,
 		baseMem: arg.BaseMem,
 	}, nil
 }
@@ -65,19 +67,31 @@ type SimServicePodArgs struct {
 }
 
 type simServicePod struct {
-	initialized      bool
+	pod              *core.Pod
 	baseMem          int64
 	lastUsedMem      int64
 	lastAvailableMem int64
 	lastLoad         float64
 	lastMemUsage     float64
 	queue            list.List
+	state            int
+}
+
+const (
+	stateInitializing = iota
+	stateRunning
+	stateTerminating
+)
+
+func (p *simServicePod) Terminate() {
+	p.state = stateTerminating
 }
 
 var _ ServicePod = &simServicePod{}
 
 var (
 	ErrDenial       = errors.New("Cannot Provide Service")
+	ErrTerminating  = errors.New("Pod is currently terminating")
 	ErrInitializing = errors.New("Pod is currently initializing, cannot provide service")
 )
 
@@ -90,27 +104,35 @@ const serviceContextStoreRatio = 0.2
 const maxProbe = 10
 
 func (p *simServicePod) GetLoad() float64 {
-	if !p.initialized {
+	switch p.state {
+	case stateRunning:
+		// 取比值的最大值
+		res := p.lastLoad
+		if p.lastLoad < p.lastMemUsage {
+			res = p.lastMemUsage
+		}
+		return res
+	default:
 		return 0
 	}
-
-	// 取比值的最大值
-	res := p.lastLoad
-	if p.lastLoad < p.lastMemUsage {
-		res = p.lastMemUsage
-	}
-	return res
 }
 
 func (p *simServicePod) DeliverRequest(ctx *ServiceContext) error {
-	if !p.initialized {
+	switch p.state {
+	case stateInitializing:
 		return ErrInitializing
-	}
-	if p.lastAvailableMem-p.lastUsedMem < int64(serviceContextStoreRatio*float64(ctx.MemRequired)) {
+	case stateTerminating:
+		return ErrTerminating
+	case stateRunning:
+		if p.lastAvailableMem-p.lastUsedMem < int64(serviceContextStoreRatio*float64(ctx.MemRequired)) {
+			return ErrDenial
+		}
+		p.queue.PushBack(ctx)
+		return nil
+	default:
+		// should not go here
 		return ErrDenial
 	}
-	p.queue.PushBack(ctx)
-	return nil
 }
 
 func (p *simServicePod) ReturnUnhandledRequests() []*ServiceContext {
@@ -157,109 +179,115 @@ func (f *freeCpuList) Pop() interface{} {
 }
 
 func (p *simServicePod) Tick(slot []float64, mem int64) (Load float64, MemUsage int64) {
-	if !p.initialized {
-		// 初始化返回
+	switch p.state {
+	case stateInitializing:
 		p.lastUsedMem = p.baseMem
 		p.lastAvailableMem = mem
 		p.lastLoad = 0.5
 		p.lastMemUsage = float64(p.baseMem) / float64(mem)
-		p.initialized = true
-		return 0.5, p.baseMem
-	}
+		p.state = stateRunning
+		Load = 0.5
+		MemUsage = p.baseMem
+	case stateRunning:
+		// 计算所需总内存
+		memRequired := p.baseMem
+		for cur := p.queue.Front(); cur != nil; cur = cur.Next() {
+			ctx := cur.Value.(*ServiceContext)
+			memRequired += ctx.MemRequired
+		}
 
-	// 计算所需总内存
-	memRequired := p.baseMem
-	for cur := p.queue.Front(); cur != nil; cur = cur.Next() {
-		ctx := cur.Value.(*ServiceContext)
-		memRequired += ctx.MemRequired
-	}
+		// 内存过少时惩罚性增加处理时间
+		slotMultiplier := memoryShortagePenalty(mem, int64(serviceContextStoreRatio*float64(mem)))
 
-	// 内存过少时惩罚性增加处理时间
-	slotMultiplier := memoryShortagePenalty(mem, int64(serviceContextStoreRatio*float64(mem)))
+		freeList := &freeCpuList{list: make([]*freeCpu, 0, len(slot))}
+		// 记录每个CPU处理单个服务的内存最大值
+		maxMemUsed := make([]int64, len(slot))
+		heap.Init(freeList)
+		for i := 0; i < len(slot); i++ {
+			heap.Push(freeList, &freeCpu{
+				cpuIdx:     i,
+				startTime:  0,
+				timeRemain: slot[i],
+			})
+		}
 
-	freeList := &freeCpuList{list: make([]*freeCpu, 0, len(slot))}
-	// 记录每个CPU处理单个服务的内存最大值
-	maxMemUsed := make([]int64, len(slot))
-	heap.Init(freeList)
-	for i := 0; i < len(slot); i++ {
-		heap.Push(freeList, &freeCpu{
-			cpuIdx:     i,
-			startTime:  0,
-			timeRemain: slot[i],
-		})
-	}
-
-	probeFailedCount := 0
-	for cur := p.queue.Front(); probeFailedCount < maxProbe && cur != nil; {
-		ctx := cur.Value.(*ServiceContext)
-		slotRequired := slotMultiplier * ctx.SlotRequired
-		cannotUsed := make([]*freeCpu, 0, len(slot))
-		var capableCpu *freeCpu
-		// 寻找最早可用CPU
-		for capableCpu = heap.Pop(freeList).(*freeCpu); capableCpu.timeRemain < slotRequired; capableCpu = heap.Pop(freeList).(*freeCpu) {
-			cannotUsed = append(cannotUsed, capableCpu)
-			if freeList.Len() == 0 {
-				capableCpu = nil
-				break
+		probeFailedCount := 0
+		for cur := p.queue.Front(); probeFailedCount < maxProbe && cur != nil; {
+			ctx := cur.Value.(*ServiceContext)
+			slotRequired := slotMultiplier * ctx.SlotRequired
+			cannotUsed := make([]*freeCpu, 0, len(slot))
+			var capableCpu *freeCpu
+			// 寻找最早可用CPU
+			for capableCpu = heap.Pop(freeList).(*freeCpu); capableCpu.timeRemain < slotRequired; capableCpu = heap.Pop(freeList).(*freeCpu) {
+				cannotUsed = append(cannotUsed, capableCpu)
+				if freeList.Len() == 0 {
+					capableCpu = nil
+					break
+				}
 			}
-		}
-		// 放回不能用的CPU
-		for _, cpu := range cannotUsed {
-			heap.Push(freeList, cpu)
-		}
+			// 放回不能用的CPU
+			for _, cpu := range cannotUsed {
+				heap.Push(freeList, cpu)
+			}
 
-		if capableCpu == nil {
-			probeFailedCount++
+			if capableCpu == nil {
+				probeFailedCount++
+				cur = cur.Next()
+				continue
+			} else {
+				probeFailedCount = 0
+			}
+
+			capableCpu.timeRemain -= slotRequired
+			capableCpu.startTime += slotRequired
+			if ctx.OnDone != nil {
+				ctx.OnDone(ctx.RequestId)
+			}
+			heap.Push(freeList, capableCpu)
+
+			if ctx.MemRequired > maxMemUsed[capableCpu.cpuIdx] {
+				maxMemUsed[capableCpu.cpuIdx] = ctx.MemRequired
+			}
+
+			// 删除已服务元素
+			shouldRemove := cur
 			cur = cur.Next()
-			continue
-		} else {
-			probeFailedCount = 0
+			p.queue.Remove(shouldRemove)
 		}
 
-		capableCpu.timeRemain -= slotRequired
-		capableCpu.startTime += slotRequired
-		if ctx.OnDone != nil {
-			ctx.OnDone(ctx.RequestId)
+		// 计算CPU负载
+		totalAvailableSlot := float64(0)
+		totalUnusedSlot := float64(0)
+		for i := 0; i < len(freeList.list); i++ {
+			totalAvailableSlot += slot[freeList.list[i].cpuIdx]
+			totalUnusedSlot += freeList.list[i].timeRemain
 		}
-		heap.Push(freeList, capableCpu)
-
-		if ctx.MemRequired > maxMemUsed[capableCpu.cpuIdx] {
-			maxMemUsed[capableCpu.cpuIdx] = ctx.MemRequired
+		// 计算内存使用
+		for i := 0; i < len(maxMemUsed); i++ {
+			MemUsage += maxMemUsed[i]
+		}
+		for cur := p.queue.Front(); cur != nil; cur = cur.Next() {
+			MemUsage += int64(serviceContextStoreRatio * float64(cur.Value.(*ServiceContext).MemRequired))
+		}
+		MemUsage += p.baseMem
+		if MemUsage > mem {
+			// 可以理解为超出的内存存储在了硬盘
+			MemUsage = mem
 		}
 
-		// 删除已服务元素
-		shouldRemove := cur
-		cur = cur.Next()
-		p.queue.Remove(shouldRemove)
+		Load = (totalAvailableSlot - totalUnusedSlot) / totalAvailableSlot
+		// 更新缓存
+		p.lastMemUsage = float64(MemUsage) / float64(mem)
+		p.lastLoad = Load
+		p.lastAvailableMem = mem
+		p.lastUsedMem = MemUsage
+	case stateTerminating:
+		p.pod.Status.Phase = v1.PodSucceeded
+		Load = 0
+		MemUsage = 0
+	default:
+		panic("should not go here")
 	}
-
-	// 计算CPU负载
-	totalAvailableSlot := float64(0)
-	totalUnusedSlot := float64(0)
-	for i := 0; i < len(freeList.list); i++ {
-		totalAvailableSlot += slot[freeList.list[i].cpuIdx]
-		totalUnusedSlot += freeList.list[i].timeRemain
-	}
-	// 计算内存使用
-	for i := 0; i < len(maxMemUsed); i++ {
-		MemUsage += maxMemUsed[i]
-	}
-	for cur := p.queue.Front(); cur != nil; cur = cur.Next() {
-		MemUsage += int64(serviceContextStoreRatio * float64(cur.Value.(*ServiceContext).MemRequired))
-	}
-	MemUsage += p.baseMem
-	if MemUsage > mem {
-		// 可以理解为超出的内存存储在了硬盘
-		MemUsage = mem
-	}
-
-	Load = (totalAvailableSlot - totalUnusedSlot) / totalAvailableSlot
-	// 更新缓存
-	p.lastMemUsage = float64(MemUsage) / float64(mem)
-	p.lastLoad = Load
-	p.lastAvailableMem = mem
-	p.lastUsedMem = MemUsage
-
 	return
 }
 

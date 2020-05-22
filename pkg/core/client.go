@@ -415,6 +415,7 @@ func (client *coreV1NodeClient) Create(_ context.Context, node *apicorev1.Node, 
 		CpuState:     make([][]*RunEntity, numCpu),
 		LastCpuUsage: 0,
 		Client:       client.sim.Client,
+		deletingPods: map[string]*podDeletion{},
 	}
 
 	err := client.sim.Nodes.Add(simNode)
@@ -709,7 +710,7 @@ func (c *coreV1PodClient) UpdateStatus(_ context.Context, pod *apicorev1.Pod, _ 
 	return pod, nil
 }
 
-func (c *coreV1PodClient) Delete(_ context.Context, name string, _ apimachineryv1.DeleteOptions) error {
+func (c *coreV1PodClient) Delete(_ context.Context, name string, opts apimachineryv1.DeleteOptions) error {
 	item, exists, err := c.sim.Pods.GetByKey(name)
 	if !exists {
 		return fmt.Errorf("no pod %s", name)
@@ -718,18 +719,35 @@ func (c *coreV1PodClient) Delete(_ context.Context, name string, _ apimachineryv
 		return errors.Wrap(err, fmt.Sprintf("error getting pod %s", name))
 	}
 
-	err = c.sim.Pods.Delete(item)
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("error deleting pod %s", name))
+	if *opts.GracePeriodSeconds == 0 {
+		err = c.sim.Pods.Delete(item)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("error deleting pod %s", name))
+		}
+		ev := &watch.Event{
+			Type:   watch.Deleted,
+			Object: &item.(*Pod).Pod,
+		}
+		err = util.GetMessageQueue().Publish(util.TopicPod, ev)
+		if err != nil {
+			logrus.Errorf("Error publishing delete event: %v", err)
+		}
 	}
 
-	ev := &watch.Event{
-		Type:   watch.Deleted,
-		Object: &item.(*Pod).Pod,
-	}
-	err = util.GetMessageQueue().Publish(util.TopicPod, ev)
-	if err != nil {
-		logrus.Errorf("Error publishing delete event: %v", err)
+	pod := item.(*Pod)
+	nodeName := pod.Spec.NodeName
+	if nodeName != "" {
+		item, exist, err := c.sim.Nodes.GetByKey(nodeName)
+		if !exist {
+			logrus.Errorf("error deleting pod: no node %s from %s.Spec.NodeName", nodeName, name)
+		} else if err != nil {
+			logrus.Errorf("error deleting pod: error getting node %s: %v", nodeName, err)
+		}
+		node := item.(*Node)
+		err = node.DeletePod(name, int(*opts.GracePeriodSeconds))
+		if err != nil {
+			logrus.Errorf("error deleting pod: error handling pod %s deletion in node %s: %v", pod.Name, nodeName, err)
+		}
 	}
 
 	return nil

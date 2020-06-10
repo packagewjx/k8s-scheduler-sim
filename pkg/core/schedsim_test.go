@@ -428,6 +428,10 @@ type deploy10TimesController struct {
 	sim   SchedulerSimulator
 }
 
+func (m *deploy10TimesController) Name() string {
+	return ""
+}
+
 func (m *deploy10TimesController) Tick() {
 	if m.phase < 10 {
 		pod := newFakePod(fmt.Sprintf("pod-%d", m.phase))
@@ -445,6 +449,10 @@ func (m *deploy10TimesController) Tick() {
 type deployMultiplePodsController struct {
 	sim    SchedulerSimulator
 	podNum int
+}
+
+func (d *deployMultiplePodsController) Name() string {
+	return ""
 }
 
 func (d *deployMultiplePodsController) Tick() {

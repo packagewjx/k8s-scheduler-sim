@@ -131,3 +131,22 @@ Kubernetes调度器拥有许多的Predicates和Priority插件，能够查看集�
   - ReplicaSet
   - Services
   - ReplicationController
+  
+## 编程注意事项
+
+### 创建Pod的必须填入项
+
+```yaml
+TypeMeta:
+ObjectMeta:
+  Name: Pod名称
+  UID: 有效的UUID，调度器需要用来识别Pod
+  Annotations:
+    core.PodAnnotationAlgorithm: 调度器算法名
+    core.PodAnnotationInitState: 初始化算法状态的json
+    core.PodAnnotationCpuLimit: CPU最大限制
+    core.PodAnnotationMemLimit: Mem最大限制
+Spec:
+  SchedulerName: "DefaultScheduler"或其他，指定使用的调度器，若为空，则无法被调度
+Status:
+```

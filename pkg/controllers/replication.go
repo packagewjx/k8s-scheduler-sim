@@ -24,7 +24,7 @@ func NewReplicationController(sim core.SchedulerSimulator, controllerName string
 	return r
 }
 
-const annotationReplicationController = "github.com/packagewjx/replicationcontroller"
+const LabelReplicationController = "github.com/packagewjx/replicationcontroller"
 
 type ReplicationController interface {
 	core.Controller
@@ -59,6 +59,10 @@ type replicationController struct {
 	state controllerState
 }
 
+func (r *replicationController) Name() string {
+	return r.name
+}
+
 func (r *replicationController) Tick() {
 	switch r.state {
 	case initializing:
@@ -67,21 +71,21 @@ func (r *replicationController) Tick() {
 			AddFunc: func(obj interface{}) {
 				pod := obj.(*v1.Pod)
 				logrus.Debugf("ReplicationController %s: Pod %s added successfully", r.name, pod.Name)
-				if pod.Annotations != nil && pod.Annotations[annotationReplicationController] == r.name {
+				if pod.Labels != nil && pod.Labels[LabelReplicationController] == r.name {
 					r.replicas[pod.Name] = pod
 				}
 			},
 			UpdateFunc: func(_, newObj interface{}) {
 				pod := newObj.(*v1.Pod)
 				logrus.Debugf("ReplicationController %s: Pod %s updated", r.name, pod.Name)
-				if pod.Annotations != nil && pod.Annotations[annotationReplicationController] == r.name {
+				if pod.Labels != nil && pod.Labels[LabelReplicationController] == r.name {
 					r.replicas[pod.Name] = pod
 				}
 			},
 			DeleteFunc: func(obj interface{}) {
 				pod := obj.(*v1.Pod)
 				logrus.Debugf("ReplicationController %s: Pod %s deleted", r.name, pod.Name)
-				if pod.Annotations != nil && pod.Annotations[annotationReplicationController] == r.name {
+				if pod.Labels != nil && pod.Labels[LabelReplicationController] == r.name {
 					delete(r.replicas, pod.Name)
 					if r.stopping[pod.Name] {
 						delete(r.stopping, pod.Name)
@@ -160,10 +164,10 @@ func (r *replicationController) Tick() {
 			for len(r.replicas) < r.replicaNum {
 				pod := r.podFactory()
 				// 添加本Controller的标志，以确定时本Controller部署的
-				if pod.Annotations == nil {
-					pod.Annotations = make(map[string]string)
+				if pod.Labels == nil {
+					pod.Labels = make(map[string]string)
 				}
-				pod.Annotations[annotationReplicationController] = r.name
+				pod.Labels[LabelReplicationController] = r.name
 				podName := pod.Name
 
 				logrus.Infof("ReplicationController %s: Creating pod %s", r.name, pod.Name)
@@ -172,6 +176,7 @@ func (r *replicationController) Tick() {
 					logrus.Errorf("ReplicationController %s: error creating pod %s: %v", r.name, podName, err)
 					continue
 				}
+				logrus.Debugf("ReplicationController %s: Pod %s created", r.name, pod.Name)
 				r.replicas[pod.Name] = pod
 			}
 		}

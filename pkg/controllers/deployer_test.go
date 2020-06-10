@@ -49,7 +49,11 @@ func (f *deployerTestSimulator) DeleteAfterController(controller core.Controller
 type fakeController struct {
 }
 
-func (f fakeController) Tick() {
+func (f *fakeController) Name() string {
+	panic("implement me")
+}
+
+func (f *fakeController) Tick() {
 	panic("implement me")
 }
 
@@ -58,9 +62,9 @@ func TestDeployer(t *testing.T) {
 
 	deployer := NewControllerDeployer(sim)
 
-	deployer.DeployAt(fakeController{}, 10, BeforeUpdate)
+	deployer.DeployAt(&fakeController{}, 10, BeforeUpdate)
 
-	deployer.DeployAt(fakeController{}, 100, AfterUpdate)
+	deployer.DeployAt(&fakeController{}, 100, AfterUpdate)
 
 	for i := 0; i < 10; i++ {
 		deployer.Tick()

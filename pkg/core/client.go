@@ -604,11 +604,6 @@ func (c *coreV1PodClient) Create(_ context.Context, pod *apicorev1.Pod, _ apimac
 
 	stateString, _ := pod.Annotations[PodAnnotationInitialState]
 
-	_, ok = pod.Annotations[PodAnnotationDeploymentController]
-	if !ok {
-		return nil, fmt.Errorf("pod must have deployment controller name")
-	}
-
 	clone := pod.DeepCopy()
 	simPod := &Pod{
 		Pod:       *clone,
@@ -636,6 +631,8 @@ func (c *coreV1PodClient) Create(_ context.Context, pod *apicorev1.Pod, _ apimac
 	if err != nil {
 		logrus.Errorf("Error publishing add event: %v", err)
 	}
+
+	logrus.Tracef("Pod %s added successfully", pod.Name)
 
 	return pod, nil
 }
@@ -726,6 +723,7 @@ func (c *coreV1PodClient) Delete(_ context.Context, name string, opts apimachine
 		}
 	}
 
+	// 删除对应Node上的Pod副本
 	pod := item.(*Pod)
 	nodeName := pod.Spec.NodeName
 	if nodeName != "" {
@@ -798,6 +796,8 @@ func (c *coreV1PodClient) UpdateEphemeralContainers(_ context.Context, _ string,
 }
 
 func (c *coreV1PodClient) Bind(_ context.Context, binding *apicorev1.Binding, _ apimachineryv1.CreateOptions) error {
+	fmt.Printf("In Client Bind GoRoutine %d\n", util.GetGoRoutineId())
+
 	item, exists, err := c.sim.Nodes.GetByKey(binding.Target.Name)
 	if !exists {
 		return fmt.Errorf("no node %s", binding.Target.Name)
@@ -809,7 +809,7 @@ func (c *coreV1PodClient) Bind(_ context.Context, binding *apicorev1.Binding, _ 
 
 	item, exists, err = c.sim.Pods.GetByKey(binding.Name)
 	if !exists {
-		return fmt.Errorf("no pod %s", binding.Target.Name)
+		return fmt.Errorf("no Pod %s", binding.Name)
 	}
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("error getting pod %v", err))

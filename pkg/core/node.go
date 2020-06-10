@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/metrics"
+	"github.com/packagewjx/k8s-scheduler-sim/pkg/util"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
@@ -68,11 +69,12 @@ func BuildNode(name string, cpu, mem, numPods, coreScheduler string) *v1.Node {
 
 // TODO 可能会有一些绑定失败的条件，如内存不够用等
 func (n *Node) BindPod(pod *Pod) error {
-	// 这里需要上锁是因为可能有多条调度器线程同时更改
-	n.podLock.Lock()
-	defer n.podLock.Unlock()
+	fmt.Printf("In BindPod GoRoutineId: %d\n", util.GetGoRoutineId())
 
 	logrus.Infof("Binding Pod %s to Node %s", pod.Name, n.Name)
+
+	// 这里需要上锁是因为可能有多条调度器线程同时更改
+	n.podLock.Lock()
 
 	// 暂时使用pod.Name作为键
 	key, _ := PodKeyFunc(pod)
@@ -81,6 +83,8 @@ func (n *Node) BindPod(pod *Pod) error {
 	}
 	n.Pods[key] = pod
 
+	n.podLock.Unlock()
+
 	pod.Spec.NodeName = n.Name
 	pod.Status.Phase = v1.PodRunning
 	_, err := n.Client.CoreV1().Pods(DefaultNamespace).UpdateStatus(context.TODO(), &pod.Pod, metav1.UpdateOptions{})
@@ -88,6 +92,7 @@ func (n *Node) BindPod(pod *Pod) error {
 		return errors.Wrap(err, fmt.Sprintf("error updating status of pod %s", pod.Name))
 	}
 
+	fmt.Printf("BindPod Success GoRoutineId: %d\n", util.GetGoRoutineId())
 	return nil
 }
 
@@ -225,7 +230,9 @@ func (n *Node) Tick(client kubernetes.Interface) *metrics.TickMetrics {
 func (n *Node) DeletePod(name string, gracefulTick int) error {
 	pod, ok := n.Pods[name]
 	if !ok {
-		return fmt.Errorf("no pod %s", name)
+		// 不存在这个Pod，只会发出警告
+		logrus.Warnf("no Pod %s on Node %s", name, n.Name)
+		return nil
 	}
 	if gracefulTick == 0 {
 		// 等于0的时候，相当于强制删除

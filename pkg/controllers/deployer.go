@@ -65,6 +65,11 @@ type controllerDeployer struct {
 	queue *priorityQueue
 }
 
+func (c *controllerDeployer) Name() string {
+	// 暂时没有名字
+	return ""
+}
+
 func (c *controllerDeployer) Tick() {
 	c.tick++
 

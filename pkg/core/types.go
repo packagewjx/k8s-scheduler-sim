@@ -141,14 +141,24 @@ type Controller interface {
 	// Tick 执行控制器逻辑的函数，控制器应该在此函数中将实际状态调整到期望状态。
 	// 本函数应该是同步的，且不应该使用通道，以免导致整个模拟阻塞。
 	Tick()
+
+	// 获取本控制器的名称
+	Name() string
 }
 
 type ControllerFunc struct {
-	TickFunc func()
+	NameString string
+	TickFunc   func()
 }
 
-func (c ControllerFunc) Tick() {
+var _ Controller = &ControllerFunc{}
+
+func (c *ControllerFunc) Tick() {
 	c.TickFunc()
+}
+
+func (c *ControllerFunc) Name() string {
+	return c.NameString
 }
 
 // DeploymentController 模拟Kubernetes的控制器，根据其配置的模板构建Pod，然后通过Tick方法提交到本集群
@@ -156,11 +166,6 @@ func (c ControllerFunc) Tick() {
 // 逻辑。
 // 由于部署并非100%成功，控制器需要监听集群事件，若发现部署失败，则根据情况重新部署。
 type DeploymentController interface {
-	Controller
-}
-
-// ServiceController 模拟Kubernetes中进行负载均衡的Service，负责接收外部请求，并分配到各个Service Pod上。
-type ServiceController interface {
 	Controller
 }
 

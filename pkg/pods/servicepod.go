@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/core"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -23,6 +24,9 @@ type ServicePod interface {
 	// GetLoad 获取当前Pod的负载大小。用于让控制器负载均衡。具体的计算，可以根据当前Pod能够处理的容量，以及内存使用量决定
 	// 返回的结果应该是在[0,1]区间。
 	GetLoad() float64
+
+	// GetRequestQueueLen 获取请求队列的长度
+	GetRequestQueueLen() int
 
 	// DeliverRequest 让服务Pod处理服务。Pod可能会因为队列已满或者内存不够用而导致拒绝服务，需要控制器处理拒绝服务的逻辑。
 	DeliverRequest(ctx *ServiceContext) error
@@ -50,10 +54,10 @@ type ServiceContext struct {
 const SimServicePod = "SimServicePod"
 
 var simServicePodFacory core.PodAlgorithmFactory = func(argJson string, pod *core.Pod) (core.PodAlgorithm, error) {
-	arg := &SimServicePodArgs{}
+	arg := &SimServicePodArgs{BaseMem: 0}
 	err := json.Unmarshal([]byte(argJson), arg)
 	if err != nil {
-		return nil, errors.Wrap(err, "error unmarshal arg json")
+		logrus.Warnf("error unmarshal arg json : %s. Using default parameter", err)
 	}
 	return &simServicePod{
 		pod:     pod,
@@ -115,6 +119,10 @@ func (p *simServicePod) GetLoad() float64 {
 	default:
 		return 0
 	}
+}
+
+func (p *simServicePod) GetRequestQueueLen() int {
+	return p.queue.Len()
 }
 
 func (p *simServicePod) DeliverRequest(ctx *ServiceContext) error {

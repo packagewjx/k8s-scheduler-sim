@@ -6,6 +6,7 @@ import (
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/informers"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/metrics"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/mock"
+	"github.com/packagewjx/k8s-scheduler-sim/pkg/util"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
@@ -63,7 +64,7 @@ type schedSim struct {
 	cancelFunc            context.CancelFunc
 
 	// 当前的时钟周期数
-	Tick int
+	tick int
 	// 总运行时钟周期数
 	TotalTick int
 
@@ -143,7 +144,6 @@ func NewSchedulerSimulator(totalTick int) SchedulerSimulator {
 		Scheduler:             nil,
 		TotalTick:             totalTick,
 		cancelFunc:            cancel,
-		bindPodCh:             make(chan string),
 	}
 
 	client, err := NewClient(sim)
@@ -190,13 +190,11 @@ func (sim *schedSim) Run() {
 			pod := newObj.(*v1.Pod)
 			if _, ok := newPods[pod.Name]; ok {
 				delete(newPods, pod.Name)
-				if pod.Spec.NodeName != "" {
-					wg.Done()
-				} else {
+				defer wg.Done()
+				if pod.Spec.NodeName == "" {
 					for _, condition := range pod.Status.Conditions {
 						if condition.Reason == v1.PodReasonUnschedulable {
 							logrus.Warnf("Pod %s scheduled failed: %s", pod.Name, condition.Message)
-							wg.Done()
 							break
 						}
 					}
@@ -214,7 +212,8 @@ func (sim *schedSim) Run() {
 			controller.Tick()
 		}
 		// 等待调度器线程bind
-		wg.Wait()
+		//wg.Wait()
+		util.WaitTimeout(&wg, time.Second)
 
 		logrus.Debug("Updating Node status")
 		nodes := sim.Nodes.List()
@@ -248,7 +247,6 @@ func (sim *schedSim) Run() {
 			controller.Tick()
 		}
 	}
-
 }
 
 type controllerTiming int

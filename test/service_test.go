@@ -7,17 +7,16 @@ import (
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/core"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/pods"
 	"github.com/packagewjx/k8s-scheduler-sim/pkg/util"
-	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
 )
 
 func TestService(t *testing.T) {
-	logrus.SetLevel(logrus.DebugLevel)
+	//logrus.SetLevel(logrus.DebugLevel)
 	fmt.Printf("Main GoRoutine: %d\n", util.GetGoRoutineId())
 
-	simulator := core.NewSchedulerSimulator(1000)
+	simulator := core.NewSchedulerSimulator(100)
 
 	node := core.BuildNode("test-node", "20", "10G", "1000", core.FairScheduler)
 	_, err := simulator.GetKubernetesClient().CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})

@@ -132,9 +132,6 @@ func (p *simServicePod) DeliverRequest(ctx *ServiceContext) error {
 	case stateTerminating:
 		return ErrTerminating
 	case stateRunning:
-		if p.lastAvailableMem-p.lastUsedMem < int64(serviceContextStoreRatio*float64(ctx.MemRequired)) {
-			return ErrDenial
-		}
 		p.queue.PushBack(ctx)
 		return nil
 	default:

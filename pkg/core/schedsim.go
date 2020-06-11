@@ -233,9 +233,9 @@ func (sim *schedSim) Run() {
 
 		// 显示各个节点的状态
 		// 打印表头
-		fmt.Println("Node\tCPU  \tCPUALL\tCPU60\tCPU300\tCPU1500\tMem  \tMemALL\tMem60\tMem300\tMem1500\tLoad \tLoadALL\tLoad60\tLoad300\tLoad1500")
+		fmt.Println("Node                \tCPU  \tCPUALL\tCPU60\tCPU300\tCPU1500\tMem  \tMemALL\tMem60\tMem300\tMem1500\tLoad \tLoadALL\tLoad60\tLoad300\tLoad1500")
 		for i, metric := range currentMetrics {
-			fmt.Printf("%s\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\n", nodes[i].(*Node).Name,
+			fmt.Printf("%-20s\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\n", nodes[i].(*Node).Name,
 				metric.CpuUsageLastTick, metric.CpuUsageAverage, metric.CpuUsageAverageIn60Ticks, metric.CpuUsageAverageIn300Ticks, metric.CpuUsageAverageIn1500Ticks,
 				metric.MemUsageLastTick, metric.MemUsageAverage, metric.MemUsageAverageIn60Ticks, metric.MemUsageAverageIn300Ticks, metric.MemUsageAverageIn1500Ticks,
 				metric.LoadLastTick, metric.LoadAverage, metric.LoadAverageIn60Ticks, metric.LoadAverageIn300Ticks, metric.LoadAverageIn1500Ticks)
